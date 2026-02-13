@@ -20,7 +20,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">52</div>
+        <div className="brand-mark">ZY</div>
         <div>
           <div className="brand-title">বায়ান্ন পে</div>
           <div className="brand-sub">অ্যাডমিন কনসোল</div>
