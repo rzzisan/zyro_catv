@@ -1,18 +1,30 @@
-function Topbar({ title, subtitle }) {
+function Topbar({ title, subtitle, onToggleSidebar }) {
   return (
-    <div className="topbar">
-      <div>
-        <div className="topbar-title">{title}</div>
-        <div className="topbar-subtitle">{subtitle}</div>
+    <header className="topbar">
+      <div className="topbar-left">
+        <button
+          className="menu-toggle"
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Toggle sidebar"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <div>
+          <div className="topbar-title">{title}</div>
+          <div className="topbar-sub">{subtitle}</div>
+        </div>
       </div>
       <div className="topbar-user">
         <div className="avatar" aria-hidden="true" />
         <div>
-          <div className="user-name">নাসিম সাইফুল</div>
-          <div className="user-role">সিস্টেম অ্যাডমিন</div>
+          <div className="user-name">Zyrotech CATV billing Managment</div>
+          <div className="user-role">Admin Panel</div>
         </div>
       </div>
-    </div>
+    </header>
   )
 }
 

@@ -1,54 +1,61 @@
 import { NavLink } from 'react-router-dom'
 
-const menuItems = [
+const modules = [
   { label: 'ড্যাশবোর্ড', to: '/dashboard' },
-  { label: 'এরিয়া', to: '/area' },
-  { label: 'ম্যানেজার' },
-  { label: 'কালেক্টর' },
-  { label: 'অপারেটর' },
-  { label: 'গ্রাহক' },
-  { label: 'বিল' },
-  { label: 'রিপোর্ট' },
-  { label: 'ডিপোজিট' },
-  { label: 'খরচ হিসাব' },
-  { label: 'খরচের খাত' },
-  { label: 'কর্মচারী' },
-  { label: 'টিউটোরিয়াল' },
+  { label: 'এরিয়া', to: '/areas' },
+  { label: 'ম্যানেজার', to: '/managers' },
+  { label: 'কালেক্টর', to: '/collectors' },
+  { label: 'গ্রাহক', to: '/customers' },
+  { label: 'বিল', to: '/billing' },
+  { label: 'রিপোর্ট', to: '/reports' },
+  { label: 'ডিপোজিট', to: '/deposits' },
+  { label: 'খরচ হিসাব', to: '/expenses' },
+  { label: 'খরচের খাত', to: '/expense-categories' },
+  { label: 'কর্মচারী', to: '/employees' },
+  { label: 'টিউটোরিয়াল', to: '/tutorials' },
 ]
 
-function Sidebar() {
+function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
   return (
-    <aside className="sidebar">
-      <div className="brand">
+    <>
+      <aside
+        className={`sidebar ${isCollapsed ? 'is-collapsed' : ''} ${
+          isMobileOpen ? 'is-open' : ''
+        }`}
+      >
+        <div className="sidebar-brand">
         <div className="brand-mark">ZY</div>
         <div>
-          <div className="brand-title">বায়ান্ন পে</div>
-          <div className="brand-sub">অ্যাডমিন কনসোল</div>
+          <div className="brand-title">Zyrotech CATV</div>
+          <div className="brand-sub">billing Managment</div>
         </div>
+        <button className="sidebar-close" type="button" onClick={onClose}>
+          ✕
+        </button>
       </div>
-      <ul className="menu">
-        {menuItems.map((item) => (
-          <li key={item.label}>
-            {item.to ? (
-              <NavLink
-                to={item.to}
-                className={({ isActive }) =>
-                  `menu-link ${isActive ? 'active' : ''}`
-                }
-              >
-                <span className="menu-dot" />
-                {item.label}
-              </NavLink>
-            ) : (
-              <span className="menu-link is-disabled">
-                <span className="menu-dot" />
-                {item.label}
-              </span>
-            )}
-          </li>
+      <nav className="sidebar-nav">
+        {modules.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `nav-link ${isActive ? 'active' : ''}`
+            }
+            onClick={onClose}
+          >
+            <span className="nav-dot" />
+            <span className="nav-label">{item.label}</span>
+          </NavLink>
         ))}
-      </ul>
-    </aside>
+      </nav>
+      </aside>
+      <button
+        className={`sidebar-overlay ${isMobileOpen ? 'is-visible' : ''}`}
+        type="button"
+        aria-label="Close sidebar"
+        onClick={onClose}
+      />
+    </>
   )
 }
 

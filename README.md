@@ -1,16 +1,50 @@
-# React + Vite
+# Zyrotech CATV Billing Management
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository contains a mobile-friendly CATV billing management system with a React UI and a Node/Express API backed by MariaDB.
 
-Currently, two official plugins are available:
+## Requirements
+- Node.js 18+
+- MariaDB 10.11+
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Environment Setup
+Create the backend environment file:
 
-## React Compiler
+```bash
+cp server/.env.example server/.env
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Update `server/.env` if you use different credentials:
 
-## Expanding the ESLint configuration
+```env
+DATABASE_URL="mysql://zyro_catv:ZyRO55%23%24@localhost:3306/zyro_catv"
+PORT=5000
+JWT_SECRET="change_this_secret"
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Database
+From the server folder:
+
+```bash
+cd server
+npm install
+npx prisma generate
+npx prisma migrate dev --name init
+npm run db:seed
+```
+
+Seeded demo accounts:
+- Admin: `01700000000` / `admin123`
+- Manager: `01800000000` / `manager123`
+- Collector: `01900000000` / `collector123`
+
+## Run Backend
+```bash
+cd server
+npm run dev
+```
+
+## Run Frontend
+```bash
+npm install
+npm run dev
+```

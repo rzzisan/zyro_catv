@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  COLLECTOR
+}
+
+enum BillingType {
+  ACTIVE
+  FREE
+  CLOSED
+}
+
+enum BillStatus {
+  DUE
+  PARTIAL
+  PAID
+  ADVANCE
+}
+
+model Package {
+  id             String    @id @default(cuid())
+  name           String
+  price          Int
+  durationMonths Int?
+  features       Json?
+  createdAt      DateTime  @default(now())
+  companies      Company[]
+}
+
+model Company {
+  id            String         @id @default(cuid())
+  name          String
+  packageId     String?
+  createdAt     DateTime       @default(now())
+  package       Package?       @relation(fields: [packageId], references: [id])
+  users         User[]
+  areas         Area[]
+  customerTypes CustomerType[]
+  customers     Customer[]
+  bills         Bill[]
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  companyId          String
+  role               UserRole
+  name               String
+  mobile             String
+  email              String?
+  passwordHash       String
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  company            Company             @relation(fields: [companyId], references: [id])
+  managerPermissions ManagerPermission[]
+  collectedPayments  Payment[]
+  createdAreas       Area[]
+  createdCustomerTypes CustomerType[]
+  createdCustomers   Customer[]
+
+  @@unique([companyId, mobile])
+}
+
+model Permission {
+  id                 String              @id @default(cuid())
+  key                String              @unique
+  label              String
+  managerPermissions ManagerPermission[]
+}
+
+model ManagerPermission {
+  id           String     @id @default(cuid())
+  managerId    String
+  permissionId String
+  manager      User       @relation(fields: [managerId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([managerId, permissionId])
+}
+
+model Area {
+  id          String     @id @default(cuid())
+  companyId   String
+  name        String
+  createdById String?
+  createdAt   DateTime   @default(now())
+  company     Company    @relation(fields: [companyId], references: [id])
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  customers   Customer[]
+
+  @@unique([companyId, name])
+}
+
+model CustomerType {
+  id          String     @id @default(cuid())
+  companyId   String
+  name        String
+  createdById String?
+  createdAt   DateTime   @default(now())
+  company     Company    @relation(fields: [companyId], references: [id])
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  customers   Customer[]
+
+  @@unique([companyId, name])
+}
+
+model Customer {
+  id             String      @id @default(cuid())
+  companyId      String
+  areaId         String
+  customerTypeId String
+  customerCode   String
+  name           String
+  mobile         String
+  address        String?
+  billingType    BillingType @default(ACTIVE)
+  monthlyFee     Int?
+  dueBalance     Int         @default(0)
+  connectionDate DateTime
+  createdById    String?
+  createdAt      DateTime    @default(now())
+  company        Company     @relation(fields: [companyId], references: [id])
+  area           Area        @relation(fields: [areaId], references: [id])
+  customerType   CustomerType @relation(fields: [customerTypeId], references: [id])
+  createdBy      User?       @relation(fields: [createdById], references: [id])
+  bills          Bill[]
+
+  @@unique([companyId, customerCode])
+  @@index([companyId, mobile])
+}
+
+model Bill {
+  id          String     @id @default(cuid())
+  companyId   String
+  customerId  String
+  periodMonth Int
+  periodYear  Int
+  amount      Int
+  status      BillStatus @default(DUE)
+  createdAt   DateTime   @default(now())
+  company     Company    @relation(fields: [companyId], references: [id])
+  customer    Customer   @relation(fields: [customerId], references: [id])
+  payments    Payment[]
+
+  @@unique([customerId, periodMonth, periodYear])
+  @@index([companyId, status])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  billId        String
+  amount        Int
+  paidAt        DateTime @default(now())
+  collectedById String?
+  bill          Bill     @relation(fields: [billId], references: [id])
+  collectedBy   User?    @relation(fields: [collectedById], references: [id])
+}
