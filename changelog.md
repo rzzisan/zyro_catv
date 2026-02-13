@@ -69,3 +69,17 @@
 
 - Update: Added collapsible sidebar with mobile off-canvas behavior and overlay.
 - Update: Added topbar menu toggle button for sidebar control.
+
+- Feature: Added backend APIs for areas, managers, and collectors with role-based access.
+- Feature: Wired Areas, Managers, and Collectors pages to list and create records.
+- UI: Added status banners for module feedback.
+
+- Fix: Removed accidental command text from App.jsx.
+- Ops: Added Nginx proxy for /areas and /users API routes.
+
+- Fix: Moved API routes under /api to avoid SPA route conflicts.
+- Ops: Updated Nginx proxy to /api and frontend API base to /api.
+
+- Fix: Cleaned corrupted server .env so DATABASE_URL loads correctly.
+
+- Fix: Removed invalid createdById field when creating managers/collectors.

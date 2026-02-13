@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const apiBase = import.meta.env.PROD
-  ? ''
+  ? '/api'
   : import.meta.env.VITE_API_BASE || 'http://localhost:5000'
 
 function Home() {

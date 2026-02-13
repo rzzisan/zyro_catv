@@ -799,6 +799,18 @@ a {
   font-weight: 700;
 }
 
+.status-banner {
+  margin-top: 1rem;
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  font-weight: 600;
+}
+
+.status-banner.error {
+  background: rgba(255, 122, 89, 0.12);
+  color: #b24734;
+}
+
 .balance-card {
   background: var(--surface);
   border-radius: var(--radius);
