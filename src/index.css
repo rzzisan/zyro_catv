@@ -875,6 +875,11 @@ a {
   font-weight: 600;
 }
 
+.detail-card {
+  margin-top: 1.4rem;
+  gap: 0.8rem;
+}
+
 .metric-value {
   font-size: 1.3rem;
   margin-bottom: 0.3rem;

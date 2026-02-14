@@ -13,8 +13,22 @@ const formatDateInput = (value) => {
 
 const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
 
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
+}
+
 function Reports() {
   const [rows, setRows] = useState([])
+  const [detailRows, setDetailRows] = useState([])
   const [collectors, setCollectors] = useState([])
   const [filters, setFilters] = useState({
     mode: 'today',
@@ -31,12 +45,14 @@ function Reports() {
   })
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const role = getUserRole()
 
   const token = localStorage.getItem('auth_token')
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams()
     if (filters.collectorId) params.append('collectorId', filters.collectorId)
+    if (role === 'COLLECTOR') params.append('details', 'true')
 
     if (filters.mode === 'range') {
       params.append('startDate', filters.startDate)
@@ -48,7 +64,7 @@ function Reports() {
 
     const query = params.toString()
     return query ? `?${query}` : ''
-  }, [filters])
+  }, [filters, role])
 
   const loadCollectors = async () => {
     if (!token) return
@@ -79,6 +95,7 @@ function Reports() {
       }
       setRows(data.data || [])
       setSummary(data.summary || summary)
+      setDetailRows(data.details || [])
     } catch (error) {
       setStatus(error.message)
     } finally {
@@ -178,20 +195,22 @@ function Reports() {
               </label>
             </>
           ) : null}
-          <label className="filter-item">
-            <span>কালেক্টর</span>
-            <select
-              value={filters.collectorId}
-              onChange={(event) => setFilters((prev) => ({ ...prev, collectorId: event.target.value }))}
-            >
-              <option value="">সব</option>
-              {collectors.map((collector) => (
-                <option key={collector.id} value={collector.id}>
-                  {collector.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {role === 'COLLECTOR' ? null : (
+            <label className="filter-item">
+              <span>কালেক্টর</span>
+              <select
+                value={filters.collectorId}
+                onChange={(event) => setFilters((prev) => ({ ...prev, collectorId: event.target.value }))}
+              >
+                <option value="">সব</option>
+                {collectors.map((collector) => (
+                  <option key={collector.id} value={collector.id}>
+                    {collector.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
         <table className="data-table">
@@ -212,6 +231,34 @@ function Reports() {
             ))}
           </tbody>
         </table>
+        {role === 'COLLECTOR' ? (
+          <div className="module-card detail-card">
+            <div className="module-title">দৈনিক বিস্তারিত রিপোর্ট</div>
+            <div className="module-sub">বিল সংগ্রহ করা গ্রাহকের তালিকা</div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>গ্রাহক</th>
+                  <th>মোবাইল</th>
+                  <th>তারিখ</th>
+                  <th>মেথড</th>
+                  <th>পরিমাণ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.customer ? `${row.customer.name} (${row.customer.customerCode})` : '—'}</td>
+                    <td>{row.customer?.mobile || '—'}</td>
+                    <td>{formatDateInput(row.paidAt)}</td>
+                    <td>{row.method || '—'}</td>
+                    <td>{formatCurrency(row.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
         {status ? <div className="status-banner error">{status}</div> : null}
       </div>
     </AppLayout>

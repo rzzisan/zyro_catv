@@ -43,6 +43,8 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
   try {
     const { collectorId } = req.query
     const range = resolveRange(req.query)
+    const detailsFlag = String(req.query.details || '').toLowerCase()
+    const includeDetails = req.user.role === 'COLLECTOR' || detailsFlag === 'true' || detailsFlag === '1'
     const where = {
       paidAt: {
         gte: range.start,
@@ -61,7 +63,11 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
       where,
       include: {
         collectedBy: { select: { id: true, name: true } },
+        ...(includeDetails
+          ? { bill: { select: { id: true, customer: { select: { name: true, customerCode: true, mobile: true } } } } }
+          : {}),
       },
+      orderBy: { paidAt: 'desc' },
     })
 
     const rowsByCollector = new Map()
@@ -87,6 +93,16 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
     }
 
     const data = Array.from(rowsByCollector.values()).sort((a, b) => b.totalAmount - a.totalAmount)
+    const details = includeDetails
+      ? payments.map((payment) => ({
+          id: payment.id,
+          amount: payment.amount,
+          paidAt: payment.paidAt,
+          method: payment.method,
+          collector: payment.collectedBy,
+          customer: payment.bill?.customer || null,
+        }))
+      : undefined
 
     return res.json({
       data,
@@ -95,6 +111,7 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
         totalAmount,
         totalCount,
       },
+      details,
       range: {
         mode: range.mode,
         start: range.start.toISOString(),
