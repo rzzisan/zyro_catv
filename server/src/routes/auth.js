@@ -15,11 +15,13 @@ const registerSchema = z.object({
   password: z.string().min(6).max(100),
   email: z.string().email().optional().or(z.literal('')),
   packageId: z.string().optional().nullable(),
+  rememberMe: z.boolean().optional(),
 })
 
 const loginSchema = z.object({
   mobile: z.string().regex(bdMobileRegex),
   password: z.string().min(6).max(100),
+  rememberMe: z.boolean().optional(),
 })
 
 router.post('/register-company', async (req, res) => {
@@ -28,7 +30,7 @@ router.post('/register-company', async (req, res) => {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
   }
 
-  const { name, companyName, mobile, password, email, packageId } = parsed.data
+  const { name, companyName, mobile, password, email, packageId, rememberMe } = parsed.data
 
   const existingUser = await prisma.user.findFirst({
     where: {
@@ -66,7 +68,7 @@ router.post('/register-company', async (req, res) => {
     userId: adminUser.id,
     role: adminUser.role,
     companyId: adminUser.companyId,
-  })
+  }, rememberMe)
 
   return res.status(201).json({
     token,
@@ -90,7 +92,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
   }
 
-  const { mobile, password } = parsed.data
+  const { mobile, password, rememberMe } = parsed.data
 
   const user = await prisma.user.findFirst({
     where: {
@@ -112,7 +114,7 @@ router.post('/login', async (req, res) => {
     userId: user.id,
     role: user.role,
     companyId: user.companyId,
-  })
+  }, rememberMe)
 
   return res.json({
     token,

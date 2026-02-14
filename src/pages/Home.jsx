@@ -8,7 +8,7 @@ const apiBase = import.meta.env.PROD
 function Home() {
   const navigate = useNavigate()
   const [showRegister, setShowRegister] = useState(false)
-  const [loginForm, setLoginForm] = useState({ mobile: '', password: '' })
+  const [loginForm, setLoginForm] = useState({ mobile: '', password: '', rememberMe: false })
   const [registerForm, setRegisterForm] = useState({
     name: '',
     companyName: '',
@@ -16,18 +16,19 @@ function Home() {
     email: '',
     packageId: '',
     password: '',
+    rememberMe: false,
   })
   const [status, setStatus] = useState({ type: '', message: '' })
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLoginChange = (event) => {
-    const { name, value } = event.target
-    setLoginForm((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = event.target
+    setLoginForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleRegisterChange = (event) => {
-    const { name, value } = event.target
-    setRegisterForm((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = event.target
+    setRegisterForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const submitLogin = async (event) => {
@@ -126,6 +127,15 @@ function Home() {
               autoComplete="current-password"
             />
           </label>
+          <label className="field checkbox-field">
+            <input
+              name="rememberMe"
+              type="checkbox"
+              checked={loginForm.rememberMe}
+              onChange={handleLoginChange}
+            />
+            <span>আমাকে মনে রাখুন (৩০ দিন)</span>
+          </label>
           <button className="btn primary" type="submit" disabled={isLoading}>
             {isLoading ? 'লোড হচ্ছে...' : 'লগইন করুন'}
           </button>
@@ -209,6 +219,15 @@ function Home() {
                 />
               </label>
             </div>
+            <label className="field checkbox-field">
+              <input
+                name="rememberMe"
+                type="checkbox"
+                checked={registerForm.rememberMe}
+                onChange={handleRegisterChange}
+              />
+              <span>আমাকে মনে রাখুন (৩০ দিন)</span>
+            </label>
             <button className="btn primary" type="submit" disabled={isLoading}>
               {isLoading ? 'লোড হচ্ছে...' : 'রেজিস্টার করুন'}
             </button>
