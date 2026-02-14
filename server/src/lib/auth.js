@@ -2,8 +2,9 @@ import jwt from 'jsonwebtoken'
 
 const jwtSecret = process.env.JWT_SECRET || 'dev_secret'
 
-export function signToken(payload) {
-  return jwt.sign(payload, jwtSecret, { expiresIn: '7d' })
+export function signToken(payload, rememberMe = false) {
+  const expiresIn = rememberMe ? '30d' : '7d'
+  return jwt.sign(payload, jwtSecret, { expiresIn })
 }
 
 export function requireAuth(req, res, next) {
