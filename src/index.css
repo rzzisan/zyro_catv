@@ -200,6 +200,14 @@ a {
   gap: 0.9rem;
 }
 
+.modal .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.modal .field {
+  min-width: 0;
+}
+
 .field {
   display: grid;
   gap: 0.45rem;
@@ -1122,6 +1130,8 @@ a {
   border-radius: 18px;
   padding: 1.6rem;
   width: min(720px, 94vw);
+  max-height: 90vh;
+  overflow: auto;
   box-shadow: var(--shadow);
   display: grid;
   gap: 0.9rem;
@@ -1196,6 +1206,16 @@ a {
   .filter-item.search {
     grid-column: span 1;
   }
+
+  .modal {
+    width: min(640px, 96vw);
+    max-height: 92vh;
+    padding: 1.4rem;
+  }
+
+  .modal .form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -1219,5 +1239,10 @@ a {
 
   .data-cards {
     display: grid;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

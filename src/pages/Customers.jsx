@@ -27,6 +27,7 @@ function Customers() {
     q: '',
   })
   const [isOpen, setIsOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({
     areaId: '',
     customerTypeId: '',
@@ -103,20 +104,44 @@ function Customers() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  const resetForm = () => {
+    setForm({
+      areaId: '',
+      customerTypeId: '',
+      customerCode: '',
+      name: '',
+      mobile: '',
+      address: '',
+      billingType: 'ACTIVE',
+      monthlyFee: '',
+      dueBalance: '',
+      connectionDate: '',
+    })
+  }
+
+  const formatDateValue = (value) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toISOString().slice(0, 10)
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (!token) return
     setIsLoading(true)
     setStatus('')
     try {
+      const isEdit = Boolean(editing)
       const payload = {
         ...form,
         monthlyFee: form.monthlyFee ? Number(form.monthlyFee) : undefined,
         dueBalance: form.dueBalance ? Number(form.dueBalance) : undefined,
       }
 
-      const response = await fetch(`${apiBase}/customers`, {
-        method: 'POST',
+      const url = isEdit ? `${apiBase}/customers/${editing.id}` : `${apiBase}/customers`
+      const response = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -127,19 +152,49 @@ function Customers() {
       if (!response.ok) {
         throw new Error(data.error || 'গ্রাহক তৈরি করা যায়নি')
       }
-      setForm({
-        areaId: '',
-        customerTypeId: '',
-        customerCode: '',
-        name: '',
-        mobile: '',
-        address: '',
-        billingType: 'ACTIVE',
-        monthlyFee: '',
-        dueBalance: '',
-        connectionDate: '',
-      })
+      resetForm()
+      setEditing(null)
       setIsOpen(false)
+      await loadCustomers()
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleEdit = (row) => {
+    setEditing(row)
+    setForm({
+      areaId: row.areaId || '',
+      customerTypeId: row.customerTypeId || '',
+      customerCode: row.customerCode || '',
+      name: row.name || '',
+      mobile: row.mobile || '',
+      address: row.address || '',
+      billingType: row.billingType || 'ACTIVE',
+      monthlyFee: row.monthlyFee ?? '',
+      dueBalance: row.dueBalance ?? '',
+      connectionDate: formatDateValue(row.connectionDate),
+    })
+    setIsOpen(true)
+  }
+
+  const handleDelete = async (row) => {
+    if (!token) return
+    const ok = window.confirm(`"${row.name}" ডিলিট করবেন?`)
+    if (!ok) return
+    setIsLoading(true)
+    setStatus('')
+    try {
+      const response = await fetch(`${apiBase}/customers/${row.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'ডিলিট করা যায়নি')
+      }
       await loadCustomers()
     } catch (error) {
       setStatus(error.message)
@@ -156,7 +211,15 @@ function Customers() {
             <div className="module-title">গ্রাহক তালিকা</div>
             <div className="module-sub">মোট {rows.length} জন</div>
           </div>
-          <button className="btn primary" type="button" onClick={() => setIsOpen(true)}>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => {
+              setEditing(null)
+              resetForm()
+              setIsOpen(true)
+            }}
+          >
             নতুন গ্রাহক
           </button>
         </div>
@@ -227,11 +290,12 @@ function Customers() {
               <th>বিলিং</th>
               <th>মাসিক</th>
               <th>বকেয়া</th>
+              <th>অ্যাকশন</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.code}>
+              <tr key={row.id}>
                 <td>
                   <div className="cell-title">{row.name}</div>
                   <div className="cell-sub">{row.customerCode}</div>
@@ -246,6 +310,16 @@ function Customers() {
                 </td>
                 <td>৳ {row.monthlyFee ?? 0}</td>
                 <td>৳ {row.dueBalance ?? 0}</td>
+                <td>
+                  <div className="action-buttons">
+                    <button className="btn ghost small" type="button" onClick={() => handleEdit(row)}>
+                      এডিট
+                    </button>
+                    <button className="btn outline small" type="button" onClick={() => handleDelete(row)}>
+                      ডিলিট
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -261,7 +335,7 @@ function Customers() {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="modal-header">
-            <h3>নতুন গ্রাহক</h3>
+            <h3>{editing ? 'গ্রাহক এডিট' : 'নতুন গ্রাহক'}</h3>
             <button className="btn outline" type="button" onClick={() => setIsOpen(false)}>
               ✕
             </button>
@@ -380,7 +454,7 @@ function Customers() {
                 বন্ধ করুন
               </button>
               <button className="btn primary" type="submit" disabled={isLoading}>
-                {isLoading ? 'সেভ হচ্ছে...' : 'সাবমিট'}
+                {isLoading ? 'সেভ হচ্ছে...' : editing ? 'আপডেট' : 'সাবমিট'}
               </button>
             </div>
           </form>

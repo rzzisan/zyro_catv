@@ -19,6 +19,19 @@ const customerSchema = z.object({
   connectionDate: z.string().min(4),
 })
 
+const customerUpdateSchema = z.object({
+  areaId: z.string().min(1),
+  customerTypeId: z.string().min(1),
+  customerCode: z.string().min(2).max(40),
+  name: z.string().min(2).max(120),
+  mobile: z.string().regex(bdMobileRegex),
+  address: z.string().max(200).optional().nullable(),
+  billingType: z.enum(['ACTIVE', 'FREE', 'CLOSED']),
+  monthlyFee: z.number().int().nonnegative().optional().nullable(),
+  dueBalance: z.number().int().nonnegative().optional().nullable(),
+  connectionDate: z.string().min(4),
+})
+
 router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const { areaId, customerTypeId, billingType, q } = req.query
@@ -42,9 +55,9 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res,
     if (q) {
       const needle = String(q)
       where.OR = [
-        { name: { contains: needle, mode: 'insensitive' } },
+        { name: { contains: needle } },
         { mobile: { contains: needle } },
-        { customerCode: { contains: needle, mode: 'insensitive' } },
+        { customerCode: { contains: needle } },
       ]
     }
 
@@ -101,6 +114,77 @@ router.post('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'Customer already exists' })
+    }
+    return next(error)
+  }
+})
+
+router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const parsed = customerUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
+    }
+
+    const existing = await prisma.customer.findFirst({
+      where: { id: req.params.id, companyId: req.user.companyId },
+    })
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    const payload = parsed.data
+    const connectionDate = new Date(payload.connectionDate)
+    if (Number.isNaN(connectionDate.getTime())) {
+      return res.status(400).json({ error: 'Invalid connection date' })
+    }
+
+    const monthlyFee = payload.billingType === 'ACTIVE'
+      ? payload.monthlyFee ?? 0
+      : null
+
+    const customer = await prisma.customer.update({
+      where: { id: existing.id },
+      data: {
+        areaId: payload.areaId,
+        customerTypeId: payload.customerTypeId,
+        customerCode: payload.customerCode.trim(),
+        name: payload.name.trim(),
+        mobile: payload.mobile.trim(),
+        address: payload.address || null,
+        billingType: payload.billingType,
+        monthlyFee,
+        dueBalance: payload.dueBalance ?? 0,
+        connectionDate,
+      },
+    })
+
+    return res.json({ data: customer })
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Customer already exists' })
+    }
+    return next(error)
+  }
+})
+
+router.delete('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const existing = await prisma.customer.findFirst({
+      where: { id: req.params.id, companyId: req.user.companyId },
+    })
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    await prisma.customer.delete({ where: { id: existing.id } })
+
+    return res.json({ ok: true })
+  } catch (error) {
+    if (error.code === 'P2003') {
+      return res.status(409).json({ error: 'Customer has related records' })
     }
     return next(error)
   }
