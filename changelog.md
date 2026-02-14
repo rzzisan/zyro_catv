@@ -83,3 +83,5 @@
 - Fix: Cleaned corrupted server .env so DATABASE_URL loads correctly.
 
 - Fix: Removed invalid createdById field when creating managers/collectors.
+
+- Feature: Added logout button to topbar and token clear on logout.

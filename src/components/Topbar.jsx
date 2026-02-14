@@ -1,4 +1,12 @@
+import { useNavigate } from 'react-router-dom'
+
 function Topbar({ title, subtitle, onToggleSidebar }) {
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    navigate('/')
+  }
   return (
     <header className="topbar">
       <div className="topbar-left">
@@ -23,6 +31,9 @@ function Topbar({ title, subtitle, onToggleSidebar }) {
           <div className="user-name">Zyrotech CATV billing Managment</div>
           <div className="user-role">Admin Panel</div>
         </div>
+        <button className="logout-btn" type="button" onClick={handleLogout}>
+          লগআউট
+        </button>
       </div>
     </header>
   )
