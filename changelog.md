@@ -92,3 +92,7 @@
 - Feature: Added customer type management page and sidebar menu.
 
 - Feature: Added customer type edit and delete actions.
+
+- Feature: Added Excel bulk import for customers with area/type name mapping.
+
+- Feature: Added downloadable Excel template for customer bulk import.

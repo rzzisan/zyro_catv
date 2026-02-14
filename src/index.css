@@ -845,6 +845,11 @@ a {
   color: #b24734;
 }
 
+.status-banner.success {
+  background: rgba(26, 165, 123, 0.12);
+  color: #1a805f;
+}
+
 .balance-card {
   background: var(--surface);
   border-radius: var(--radius);

@@ -1,10 +1,72 @@
 import express from 'express'
+import multer from 'multer'
+import xlsx from 'xlsx'
 import { z } from 'zod'
 import prisma from '../lib/prisma.js'
 import { requireAuth, requireRole } from '../lib/auth.js'
 
 const router = express.Router()
 const bdMobileRegex = /^01[3-9]\d{8}$/
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 6 * 1024 * 1024 },
+})
+
+const normalizeKey = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '')
+
+const normalizeValue = (value) => String(value || '').trim()
+
+const headerMap = {
+  customercode: 'customerCode',
+  customerid: 'customerCode',
+  code: 'customerCode',
+  name: 'name',
+  mobile: 'mobile',
+  phone: 'mobile',
+  address: 'address',
+  area: 'area',
+  areaname: 'area',
+  customertype: 'customerType',
+  type: 'customerType',
+  billingtype: 'billingType',
+  monthlyfee: 'monthlyFee',
+  monthly: 'monthlyFee',
+  duebalance: 'dueBalance',
+  due: 'dueBalance',
+  গ্রাহকআইডি: 'customerCode',
+  গ্রাহককোড: 'customerCode',
+  নাম: 'name',
+  মোবাইল: 'mobile',
+  ঠিকানা: 'address',
+  এরিয়া: 'area',
+  গ্রাহকটাইপ: 'customerType',
+  বিলিংটাইপ: 'billingType',
+  মাসিকবিল: 'monthlyFee',
+  বকেয়াবিল: 'dueBalance',
+}
+
+const normalizeBillingType = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const upper = raw.toUpperCase()
+  if (['ACTIVE', 'FREE', 'CLOSED'].includes(upper)) return upper
+  const mapped = {
+    একটিভ: 'ACTIVE',
+    ফ্রি: 'FREE',
+    বন্ধ: 'CLOSED',
+  }
+  return mapped[raw] || null
+}
+
+const parseNumber = (value) => {
+  if (value === null || value === undefined || value === '') return undefined
+  const numberValue = Number(value)
+  return Number.isNaN(numberValue) ? undefined : numberValue
+}
 
 const customerSchema = z.object({
   areaId: z.string().min(1),
@@ -118,6 +180,173 @@ router.post('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res
     return next(error)
   }
 })
+
+router.post(
+  '/import',
+  requireAuth,
+  requireRole(['ADMIN', 'MANAGER']),
+  upload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Excel file is required' })
+      }
+
+      const allowMissingMobile = req.body.allowMissingMobile === 'true'
+
+      let workbook
+      try {
+        workbook = xlsx.read(req.file.buffer, { type: 'buffer' })
+      } catch (error) {
+        return res.status(400).json({ error: 'Invalid Excel file' })
+      }
+
+      const sheetName = workbook.SheetNames[0]
+      if (!sheetName) {
+        return res.status(400).json({ error: 'Excel sheet not found' })
+      }
+
+      const sheet = workbook.Sheets[sheetName]
+      const rawRows = xlsx.utils.sheet_to_json(sheet, { defval: '' })
+      if (!rawRows.length) {
+        return res.status(400).json({ error: 'No rows found in the Excel sheet' })
+      }
+
+      const [areas, types, existing] = await Promise.all([
+        prisma.area.findMany({
+          where: { companyId: req.user.companyId },
+          select: { id: true, name: true },
+        }),
+        prisma.customerType.findMany({
+          where: { companyId: req.user.companyId },
+          select: { id: true, name: true },
+        }),
+        prisma.customer.findMany({
+          where: { companyId: req.user.companyId },
+          select: { customerCode: true, mobile: true },
+        }),
+      ])
+
+      const areaMap = new Map(
+        areas.map((area) => [normalizeKey(area.name), area.id])
+      )
+      const typeMap = new Map(
+        types.map((type) => [normalizeKey(type.name), type.id])
+      )
+      const existingCodes = new Set(
+        existing.map((item) => normalizeValue(item.customerCode).toLowerCase())
+      )
+      const existingMobiles = new Set(
+        existing
+          .map((item) => normalizeValue(item.mobile))
+          .filter((value) => value)
+      )
+
+      let created = 0
+      let skipped = 0
+      let failed = 0
+      const errors = []
+
+      for (let index = 0; index < rawRows.length; index += 1) {
+        const row = rawRows[index]
+        const rowNumber = index + 2
+        const mapped = {}
+
+        Object.entries(row).forEach(([key, value]) => {
+          const normalizedKey = normalizeKey(key)
+          const field = headerMap[normalizedKey]
+          if (field) {
+            mapped[field] = value
+          }
+        })
+
+        const customerCode = normalizeValue(mapped.customerCode)
+        const name = normalizeValue(mapped.name)
+        const mobile = normalizeValue(mapped.mobile)
+        const billingType = normalizeBillingType(mapped.billingType) || 'ACTIVE'
+        const areaName = normalizeKey(mapped.area)
+        const typeName = normalizeKey(mapped.customerType)
+
+        if (!customerCode || !name || !areaName || !typeName || (!mobile && !allowMissingMobile)) {
+          failed += 1
+          errors.push({ row: rowNumber, reason: 'Required fields missing' })
+          continue
+        }
+
+        if (mobile && !bdMobileRegex.test(mobile)) {
+          failed += 1
+          errors.push({ row: rowNumber, reason: 'Invalid mobile number' })
+          continue
+        }
+
+        if (!['ACTIVE', 'FREE', 'CLOSED'].includes(billingType)) {
+          failed += 1
+          errors.push({ row: rowNumber, reason: 'Invalid billing type' })
+          continue
+        }
+
+        const areaId = areaMap.get(areaName)
+        const customerTypeId = typeMap.get(typeName)
+
+        if (!areaId || !customerTypeId) {
+          failed += 1
+          errors.push({ row: rowNumber, reason: 'Area or customer type not found' })
+          continue
+        }
+
+        const codeKey = customerCode.toLowerCase()
+        if (existingCodes.has(codeKey) || (mobile && existingMobiles.has(mobile))) {
+          skipped += 1
+          continue
+        }
+
+        const monthlyFee = parseNumber(mapped.monthlyFee)
+        const dueBalance = parseNumber(mapped.dueBalance) ?? 0
+
+        try {
+          await prisma.customer.create({
+            data: {
+              companyId: req.user.companyId,
+              areaId,
+              customerTypeId,
+              customerCode,
+              name,
+              mobile: mobile || '',
+              address: normalizeValue(mapped.address) || null,
+              billingType,
+              monthlyFee: billingType === 'ACTIVE' ? monthlyFee ?? 0 : null,
+              dueBalance,
+              connectionDate: new Date(),
+              createdById: req.user.userId,
+            },
+          })
+          created += 1
+          existingCodes.add(codeKey)
+          if (mobile) existingMobiles.add(mobile)
+        } catch (error) {
+          if (error.code === 'P2002') {
+            skipped += 1
+          } else {
+            failed += 1
+            errors.push({ row: rowNumber, reason: 'Database error' })
+          }
+        }
+      }
+
+      return res.json({
+        summary: {
+          total: rawRows.length,
+          created,
+          skipped,
+          failed,
+        },
+        errors: errors.slice(0, 10),
+      })
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
 
 router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
