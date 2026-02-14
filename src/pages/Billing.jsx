@@ -25,11 +25,17 @@ const statusLabel = (value) => {
   return match ? match.label : value
 }
 
-const formatDateValue = (value) => {
+const formatDateTimeValue = (value) => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  const pad = (part) => String(part).padStart(2, '0')
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+  const hours = pad(date.getHours())
+  const minutes = pad(date.getMinutes())
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
 const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
@@ -38,6 +44,13 @@ function Billing() {
   const [rows, setRows] = useState([])
   const [areas, setAreas] = useState([])
   const [collectors, setCollectors] = useState([])
+  const [company, setCompany] = useState({
+    name: 'Zyrotech CATV',
+    slogan: '',
+    helplineNumber: '',
+    invoiceNote: '',
+    address: '',
+  })
   const [filters, setFilters] = useState({
     areaId: '',
     status: '',
@@ -60,7 +73,7 @@ function Billing() {
   const [collecting, setCollecting] = useState(null)
   const [collectForm, setCollectForm] = useState({
     amount: '',
-    paidAt: formatDateValue(new Date()),
+    paidAt: formatDateTimeValue(new Date()),
     method: 'CASH',
   })
 
@@ -99,6 +112,27 @@ function Billing() {
     }
   }
 
+  const loadCompany = async () => {
+    if (!token) return
+    try {
+      const response = await fetch(`${apiBase}/company`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (response.ok && data.data) {
+        setCompany({
+          name: data.data.name || 'Zyrotech CATV',
+          slogan: data.data.slogan || '',
+          helplineNumber: data.data.helplineNumber || '',
+          invoiceNote: data.data.invoiceNote || '',
+          address: data.data.address || '',
+        })
+      }
+    } catch (error) {
+      setStatus('কোম্পানি তথ্য লোড করা যায়নি')
+    }
+  }
+
   const loadBilling = async () => {
     if (!token) return
     setIsLoading(true)
@@ -126,6 +160,7 @@ function Billing() {
 
   useEffect(() => {
     loadFilters()
+    loadCompany()
   }, [])
 
   useEffect(() => {
@@ -141,7 +176,7 @@ function Billing() {
     setCollecting(row)
     setCollectForm({
       amount: defaultAmount ? String(defaultAmount) : '',
-      paidAt: formatDateValue(new Date()),
+      paidAt: formatDateTimeValue(new Date()),
       method: 'CASH',
     })
   }
@@ -161,7 +196,7 @@ function Billing() {
         body: JSON.stringify({
           billId: collecting.billId,
           amount: Number(collectForm.amount),
-          paidAt: collectForm.paidAt,
+          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : undefined,
           method: collectForm.method,
         }),
       })
@@ -179,56 +214,7 @@ function Billing() {
   }
 
   const handlePrint = (row) => {
-    const receiptWindow = window.open('', '_blank')
-    if (!receiptWindow) return
-
-    const paidDate = row.lastPayment?.paidAt
-      ? new Date(row.lastPayment.paidAt).toLocaleString('bn-BD')
-      : new Date().toLocaleString('bn-BD')
-
-    const html = `<!doctype html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Invoice</title>
-        <style>
-          * { box-sizing: border-box; }
-          body { font-family: "Hind Siliguri", Arial, sans-serif; margin: 0; padding: 12px; }
-          .receipt { width: 58mm; }
-          h1 { font-size: 16px; margin: 0 0 8px; text-align: center; }
-          .line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
-          .muted { color: #555; }
-          .divider { border-top: 1px dashed #999; margin: 8px 0; }
-          .total { font-weight: 700; }
-          @media print {
-            body { padding: 0; }
-            .receipt { width: 58mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <h1>Zyrotech CATV</h1>
-          <div class="line"><span class="muted">তারিখ</span><span>${paidDate}</span></div>
-          <div class="line"><span class="muted">গ্রাহক</span><span>${row.name}</span></div>
-          <div class="line"><span class="muted">আইডি</span><span>${row.customerCode}</span></div>
-          <div class="line"><span class="muted">এরিয়া</span><span>${row.area?.name || '-'}</span></div>
-          <div class="divider"></div>
-          <div class="line"><span class="muted">মাসিক বিল</span><span>${formatCurrency(row.amount)}</span></div>
-          <div class="line"><span class="muted">পরিশোধ</span><span>${formatCurrency(row.paidTotal)}</span></div>
-          <div class="line"><span class="muted">বকেয়া</span><span>${formatCurrency(row.totalDue)}</span></div>
-          <div class="divider"></div>
-          <div class="line total"><span>স্ট্যাটাস</span><span>${statusLabel(row.status)}</span></div>
-          <div class="line"><span class="muted">মেথড</span><span>${row.lastPayment?.method || '-'}</span></div>
-        </div>
-      </body>
-      </html>`
-
-    receiptWindow.document.open()
-    receiptWindow.document.write(html)
-    receiptWindow.document.close()
-    receiptWindow.focus()
-    receiptWindow.print()
+    window.open(`/invoice/${row.billId}`, '_blank', 'noopener')
   }
 
   return (
@@ -435,9 +421,9 @@ function Billing() {
                   />
                 </label>
                 <label className="field">
-                  <span>তারিখ</span>
+                  <span>তারিখ ও সময়</span>
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={collectForm.paidAt}
                     onChange={(event) => setCollectForm((prev) => ({ ...prev, paidAt: event.target.value }))}
                   />

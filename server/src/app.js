@@ -7,6 +7,7 @@ import customerRoutes from './routes/customers.js'
 import billingRoutes from './routes/billing.js'
 import depositRoutes from './routes/deposits.js'
 import companyRoutes from './routes/company.js'
+import invoiceRoutes from './routes/invoices.js'
 import reportRoutes from './routes/reports.js'
 import userRoutes from './routes/users.js'
 
@@ -26,6 +27,7 @@ app.use('/api/customers', customerRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/deposits', depositRoutes)
 app.use('/api/company', companyRoutes)
+app.use('/api/invoices', invoiceRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/users', userRoutes)
 

@@ -112,3 +112,7 @@
 - Update: Deposits page now shows all deposits by default.
 
 - Feature: Added company settings page for admin.
+
+- Update: Invoice printing now uses company settings and collector name.
+
+- Update: Added print-only invoice page for easier thermal printing.

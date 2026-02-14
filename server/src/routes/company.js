@@ -13,7 +13,7 @@ const companyUpdateSchema = z.object({
   address: z.string().max(300).optional().nullable(),
 })
 
-router.get('/', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
     const company = await prisma.company.findFirst({
       where: { id: req.user.companyId },

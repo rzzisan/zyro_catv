@@ -11,6 +11,7 @@ import Employees from './pages/Employees.jsx'
 import ExpenseCategories from './pages/ExpenseCategories.jsx'
 import Expenses from './pages/Expenses.jsx'
 import Home from './pages/Home.jsx'
+import InvoicePrint from './pages/InvoicePrint.jsx'
 import Managers from './pages/Managers.jsx'
 import Reports from './pages/Reports.jsx'
 import Tutorials from './pages/Tutorials.jsx'
@@ -31,6 +32,7 @@ function App() {
         <Route path="/billing" element={<Billing />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/deposits" element={<Deposits />} />
+        <Route path="/invoice/:billId" element={<InvoicePrint />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/expense-categories" element={<ExpenseCategories />} />
         <Route path="/employees" element={<Employees />} />
