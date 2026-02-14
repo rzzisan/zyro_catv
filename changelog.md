@@ -106,3 +106,7 @@
 - Feature: Added collector area assignment settings and access restrictions.
 
 - Feature: Added collections report with date/month and collector filters.
+
+- Feature: Added collector deposits with approval workflow and dashboard summary.
+
+- Update: Deposits page now shows all deposits by default.
