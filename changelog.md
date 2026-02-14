@@ -104,3 +104,5 @@
 - Feature: Added billing list pagination with per-page options.
 
 - Feature: Added collector area assignment settings and access restrictions.
+
+- Feature: Added collections report with date/month and collector filters.
