@@ -8,7 +8,7 @@ const apiBase = import.meta.env.PROD
 function Home() {
   const navigate = useNavigate()
   const [showRegister, setShowRegister] = useState(false)
-  const [loginForm, setLoginForm] = useState({ mobile: '', password: '' })
+  const [loginForm, setLoginForm] = useState({ mobile: '', password: '', rememberMe: false })
   const [registerForm, setRegisterForm] = useState({
     name: '',
     companyName: '',
@@ -21,8 +21,8 @@ function Home() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLoginChange = (event) => {
-    const { name, value } = event.target
-    setLoginForm((prev) => ({ ...prev, [name]: value }))
+    const { name, value, type, checked } = event.target
+    setLoginForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
 
   const handleRegisterChange = (event) => {
@@ -125,6 +125,15 @@ function Home() {
               onChange={handleLoginChange}
               autoComplete="current-password"
             />
+          </label>
+          <label className="field checkbox-field">
+            <input
+              name="rememberMe"
+              type="checkbox"
+              checked={loginForm.rememberMe}
+              onChange={handleLoginChange}
+            />
+            <span>আমাকে মনে রাখুন (১ মাস)</span>
           </label>
           <button className="btn primary" type="submit" disabled={isLoading}>
             {isLoading ? 'লোড হচ্ছে...' : 'লগইন করুন'}

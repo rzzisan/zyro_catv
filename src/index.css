@@ -226,6 +226,25 @@ a {
   color: var(--ink);
 }
 
+.field.checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field.checkbox-field input[type="checkbox"] {
+  width: auto;
+  height: 1.1rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.field.checkbox-field span {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
 .auth-note {
   font-size: 0.9rem;
   color: var(--muted);
