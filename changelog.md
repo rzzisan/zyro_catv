@@ -98,3 +98,5 @@
 - Feature: Added downloadable Excel template for customer bulk import.
 
 - Feature: Added customer list pagination with per-page options.
+
+- Feature: Added billing page with filters, collection, and invoice printing.

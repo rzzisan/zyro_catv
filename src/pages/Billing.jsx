@@ -1,41 +1,416 @@
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '../components/AppLayout.jsx'
 
-const rows = [
-  { id: 'B-2401', name: 'রফিক ইসলাম', amount: '৳ 350', status: 'বকেয়া' },
-  { id: 'B-2402', name: 'সাইফুল করিম', amount: '৳ 500', status: 'পরিশোধ' },
+const apiBase = import.meta.env.PROD
+  ? '/api'
+  : import.meta.env.VITE_API_BASE || 'http://localhost:5000'
+
+const statusOptions = [
+  { value: '', label: 'সব' },
+  { value: 'DUE', label: 'বকেয়া' },
+  { value: 'PARTIAL', label: 'আংশিক পরিশোধ' },
+  { value: 'PAID', label: 'পরিশোধ' },
+  { value: 'ADVANCE', label: 'অগ্রিম' },
 ]
 
+const methodOptions = [
+  { value: 'CASH', label: 'ক্যাশ' },
+  { value: 'BKASH', label: 'বিকাশ' },
+  { value: 'NAGAD', label: 'নগদ' },
+  { value: 'BANK', label: 'ব্যাংক' },
+]
+
+const statusLabel = (value) => {
+  const match = statusOptions.find((option) => option.value === value)
+  return match ? match.label : value
+}
+
+const formatDateValue = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
+
 function Billing() {
+  const [rows, setRows] = useState([])
+  const [areas, setAreas] = useState([])
+  const [collectors, setCollectors] = useState([])
+  const [filters, setFilters] = useState({
+    areaId: '',
+    status: '',
+    collectorId: '',
+    q: '',
+  })
+  const [summary, setSummary] = useState({
+    totalCustomers: 0,
+    totalDue: 0,
+    totalPaid: 0,
+    totalAdvance: 0,
+    monthAmount: 0,
+  })
+  const [period, setPeriod] = useState({ month: null, year: null })
+  const [status, setStatus] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [collecting, setCollecting] = useState(null)
+  const [collectForm, setCollectForm] = useState({
+    amount: '',
+    paidAt: formatDateValue(new Date()),
+    method: 'CASH',
+  })
+
+  const token = localStorage.getItem('auth_token')
+
+  const filterQuery = useMemo(() => {
+    const params = new URLSearchParams()
+    if (filters.areaId) params.append('areaId', filters.areaId)
+    if (filters.status) params.append('status', filters.status)
+    if (filters.collectorId) params.append('collectorId', filters.collectorId)
+    if (filters.q) params.append('q', filters.q)
+    const query = params.toString()
+    return query ? `?${query}` : ''
+  }, [filters])
+
+  const loadFilters = async () => {
+    if (!token) return
+    try {
+      const [areasRes, collectorsRes] = await Promise.all([
+        fetch(`${apiBase}/areas`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${apiBase}/users/collectors`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
+
+      const areasData = await areasRes.json()
+      const collectorsData = await collectorsRes.json()
+      if (areasRes.ok) setAreas(areasData.data || [])
+      if (collectorsRes.ok) setCollectors(collectorsData.data || [])
+    } catch (error) {
+      setStatus('ফিল্টার লোড করা যায়নি')
+    }
+  }
+
+  const loadBilling = async () => {
+    if (!token) return
+    setIsLoading(true)
+    setStatus('')
+    try {
+      const response = await fetch(`${apiBase}/billing${filterQuery}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'বিল লোড করা যায়নি')
+      }
+      setRows(data.data || [])
+      setSummary(data.summary || summary)
+      setPeriod(data.period || period)
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadFilters()
+  }, [])
+
+  useEffect(() => {
+    loadBilling()
+  }, [filterQuery])
+
+  const openCollectModal = (row) => {
+    const defaultAmount = row.dueCurrent > 0 ? row.dueCurrent : row.amount
+    setCollecting(row)
+    setCollectForm({
+      amount: defaultAmount ? String(defaultAmount) : '',
+      paidAt: formatDateValue(new Date()),
+      method: 'CASH',
+    })
+  }
+
+  const handleCollectSubmit = async (event) => {
+    event.preventDefault()
+    if (!token || !collecting) return
+    setIsLoading(true)
+    setStatus('')
+    try {
+      const response = await fetch(`${apiBase}/billing/collect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          billId: collecting.billId,
+          amount: Number(collectForm.amount),
+          paidAt: collectForm.paidAt,
+          method: collectForm.method,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
+      }
+      setCollecting(null)
+      await loadBilling()
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePrint = (row) => {
+    const receiptWindow = window.open('', '_blank')
+    if (!receiptWindow) return
+
+    const paidDate = row.lastPayment?.paidAt
+      ? new Date(row.lastPayment.paidAt).toLocaleString('bn-BD')
+      : new Date().toLocaleString('bn-BD')
+
+    const html = `<!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Invoice</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: "Hind Siliguri", Arial, sans-serif; margin: 0; padding: 12px; }
+          .receipt { width: 58mm; }
+          h1 { font-size: 16px; margin: 0 0 8px; text-align: center; }
+          .line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+          .muted { color: #555; }
+          .divider { border-top: 1px dashed #999; margin: 8px 0; }
+          .total { font-weight: 700; }
+          @media print {
+            body { padding: 0; }
+            .receipt { width: 58mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <h1>Zyrotech CATV</h1>
+          <div class="line"><span class="muted">তারিখ</span><span>${paidDate}</span></div>
+          <div class="line"><span class="muted">গ্রাহক</span><span>${row.name}</span></div>
+          <div class="line"><span class="muted">আইডি</span><span>${row.customerCode}</span></div>
+          <div class="line"><span class="muted">এরিয়া</span><span>${row.area?.name || '-'}</span></div>
+          <div class="divider"></div>
+          <div class="line"><span class="muted">মাসিক বিল</span><span>${formatCurrency(row.amount)}</span></div>
+          <div class="line"><span class="muted">পরিশোধ</span><span>${formatCurrency(row.paidTotal)}</span></div>
+          <div class="line"><span class="muted">বকেয়া</span><span>${formatCurrency(row.totalDue)}</span></div>
+          <div class="divider"></div>
+          <div class="line total"><span>স্ট্যাটাস</span><span>${statusLabel(row.status)}</span></div>
+          <div class="line"><span class="muted">মেথড</span><span>${row.lastPayment?.method || '-'}</span></div>
+        </div>
+      </body>
+      </html>`
+
+    receiptWindow.document.open()
+    receiptWindow.document.write(html)
+    receiptWindow.document.close()
+    receiptWindow.focus()
+    receiptWindow.print()
+  }
+
   return (
     <AppLayout title="বিল" subtitle="বিলিং ও কালেকশন তালিকা">
       <div className="module-card">
         <div className="module-header">
           <div>
             <div className="module-title">বিল তালিকা</div>
-            <div className="module-sub">মোট {rows.length} টি</div>
+            <div className="module-sub">
+              মাস: {period.month || '-'} / {period.year || '-'} | মোট {summary.totalCustomers} জন
+            </div>
           </div>
-          <button className="btn primary" type="button">
-            কালেকশন
-          </button>
         </div>
+        <div className="metric-row">
+          <div className="metric-card">
+            <div className="metric-value">{formatCurrency(summary.monthAmount)}</div>
+            <div className="metric-label">চলতি মাসের বিল</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-value">{formatCurrency(summary.totalPaid)}</div>
+            <div className="metric-label">মোট পরিশোধ</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-value">{formatCurrency(summary.totalDue)}</div>
+            <div className="metric-label">মোট বকেয়া</div>
+          </div>
+          <div className="metric-card">
+            <div className="metric-value">{formatCurrency(summary.totalAdvance)}</div>
+            <div className="metric-label">মোট অগ্রিম</div>
+          </div>
+        </div>
+        <div className="filter-grid">
+          <label className="filter-item">
+            <span>এরিয়া</span>
+            <select
+              value={filters.areaId}
+              onChange={(event) => setFilters((prev) => ({ ...prev, areaId: event.target.value }))}
+            >
+              <option value="">সব</option>
+              {areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-item">
+            <span>স্ট্যাটাস</span>
+            <select
+              value={filters.status}
+              onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-item">
+            <span>কালেক্টর</span>
+            <select
+              value={filters.collectorId}
+              onChange={(event) => setFilters((prev) => ({ ...prev, collectorId: event.target.value }))}
+            >
+              <option value="">সব</option>
+              {collectors.map((collector) => (
+                <option key={collector.id} value={collector.id}>
+                  {collector.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-item search">
+            <span>সার্চ</span>
+            <input
+              type="text"
+              placeholder="নাম, মোবাইল, আইডি"
+              value={filters.q}
+              onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
+            />
+          </label>
+        </div>
+        {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
         <table className="data-table">
           <thead>
             <tr>
               <th>গ্রাহক</th>
-              <th>পরিমাণ</th>
+              <th>এরিয়া</th>
               <th>স্ট্যাটাস</th>
+              <th>মাসিক</th>
+              <th>পরিশোধ</th>
+              <th>বকেয়া</th>
+              <th>অ্যাকশন</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{row.name}</td>
-                <td>{row.amount}</td>
-                <td>{row.status}</td>
+              <tr key={row.billId}>
+                <td>
+                  <div className="cell-title">{row.name}</div>
+                  <div className="cell-sub">{row.customerCode}</div>
+                  <div className="cell-sub">{row.mobile || '—'}</div>
+                </td>
+                <td>{row.area?.name || '—'}</td>
+                <td>
+                  <span className={`status-pill ${row.status.toLowerCase()}`}>
+                    {statusLabel(row.status)}
+                  </span>
+                </td>
+                <td>{formatCurrency(row.amount)}</td>
+                <td>{formatCurrency(row.paidTotal)}</td>
+                <td>{formatCurrency(row.totalDue)}</td>
+                <td>
+                  <div className="action-buttons">
+                    <button className="btn ghost small" type="button" onClick={() => openCollectModal(row)}>
+                      কালেক্ট
+                    </button>
+                    <button className="btn outline small" type="button" onClick={() => handlePrint(row)}>
+                      ইনভয়েস
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {status ? <div className="status-banner error">{status}</div> : null}
+      </div>
+
+      <div className={`modal-overlay ${collecting ? 'is-open' : ''}`}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <h3>বিল কালেকশন</h3>
+            <button className="btn outline" type="button" onClick={() => setCollecting(null)}>
+              ✕
+            </button>
+          </div>
+          {collecting ? (
+            <form className="auth-form" onSubmit={handleCollectSubmit}>
+              <div className="form-grid">
+                <label className="field">
+                  <span>গ্রাহক</span>
+                  <input type="text" value={`${collecting.name} (${collecting.customerCode})`} disabled />
+                </label>
+                <label className="field">
+                  <span>বর্তমান বকেয়া</span>
+                  <input type="text" value={formatCurrency(collecting.totalDue)} disabled />
+                </label>
+                <label className="field">
+                  <span>পরিশোধের পরিমাণ</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={collectForm.amount}
+                    onChange={(event) => setCollectForm((prev) => ({ ...prev, amount: event.target.value }))}
+                    placeholder="পরিমাণ"
+                  />
+                </label>
+                <label className="field">
+                  <span>তারিখ</span>
+                  <input
+                    type="date"
+                    value={collectForm.paidAt}
+                    onChange={(event) => setCollectForm((prev) => ({ ...prev, paidAt: event.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span>মেথড</span>
+                  <select
+                    value={collectForm.method}
+                    onChange={(event) => setCollectForm((prev) => ({ ...prev, method: event.target.value }))}
+                  >
+                    {methodOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="modal-actions">
+                <button className="btn ghost" type="button" onClick={() => setCollecting(null)}>
+                  বাতিল
+                </button>
+                <button className="btn primary" type="submit" disabled={isLoading}>
+                  {isLoading ? 'সেভ হচ্ছে...' : 'সেভ'}
+                </button>
+              </div>
+            </form>
+          ) : null}
+        </div>
+        <button className="modal-backdrop" type="button" aria-label="Close" onClick={() => setCollecting(null)} />
       </div>
     </AppLayout>
   )

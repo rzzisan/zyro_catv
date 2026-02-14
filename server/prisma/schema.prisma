@@ -158,6 +158,7 @@ model Payment {
   id            String   @id @default(cuid())
   billId        String
   amount        Int
+  method        String?
   paidAt        DateTime @default(now())
   collectedById String?
   bill          Bill     @relation(fields: [billId], references: [id])

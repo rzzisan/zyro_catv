@@ -4,6 +4,7 @@ import authRoutes from './routes/auth.js'
 import areaRoutes from './routes/areas.js'
 import customerTypeRoutes from './routes/customer-types.js'
 import customerRoutes from './routes/customers.js'
+import billingRoutes from './routes/billing.js'
 import userRoutes from './routes/users.js'
 
 const app = express()
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/areas', areaRoutes)
 app.use('/api/customer-types', customerTypeRoutes)
 app.use('/api/customers', customerRoutes)
+app.use('/api/billing', billingRoutes)
 app.use('/api/users', userRoutes)
 
 app.use((err, req, res, next) => {
