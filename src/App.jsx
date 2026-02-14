@@ -4,6 +4,7 @@ import Billing from './pages/Billing.jsx'
 import Collectors from './pages/Collectors.jsx'
 import Customers from './pages/Customers.jsx'
 import CustomerTypes from './pages/CustomerTypes.jsx'
+import CompanySettings from './pages/CompanySettings.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Deposits from './pages/Deposits.jsx'
 import Employees from './pages/Employees.jsx'
@@ -26,6 +27,7 @@ function App() {
         <Route path="/collectors" element={<Collectors />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/customer-types" element={<CustomerTypes />} />
+        <Route path="/company-settings" element={<CompanySettings />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/deposits" element={<Deposits />} />

@@ -45,6 +45,10 @@ model Package {
 model Company {
   id            String         @id @default(cuid())
   name          String
+  helplineNumber String?
+  invoiceNote   String?        @db.Text
+  slogan        String?
+  address       String?        @db.Text
   packageId     String?
   createdAt     DateTime       @default(now())
   package       Package?       @relation(fields: [packageId], references: [id])

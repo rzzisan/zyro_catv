@@ -110,3 +110,5 @@
 - Feature: Added collector deposits with approval workflow and dashboard summary.
 
 - Update: Deposits page now shows all deposits by default.
+
+- Feature: Added company settings page for admin.

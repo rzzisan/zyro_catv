@@ -10,6 +10,7 @@ const modules = [
   { label: 'বিল', to: '/billing' },
   { label: 'রিপোর্ট', to: '/reports' },
   { label: 'ডিপোজিট', to: '/deposits' },
+  { label: 'কোম্পানি সেটিং', to: '/company-settings' },
   { label: 'খরচ হিসাব', to: '/expenses' },
   { label: 'খরচের খাত', to: '/expense-categories' },
   { label: 'কর্মচারী', to: '/employees' },
@@ -34,6 +35,9 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
   const collectorHidden = new Set(['/areas', '/customer-types', '/collectors', '/managers'])
   const visibleModules = modules.filter((item) => {
     if (role === 'COLLECTOR' && collectorHidden.has(item.to)) {
+      return false
+    }
+    if (item.to === '/company-settings' && role !== 'ADMIN') {
       return false
     }
     return true
