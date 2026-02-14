@@ -97,6 +97,17 @@ const customerUpdateSchema = z.object({
 router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const { areaId, customerTypeId, billingType, q } = req.query
+    const pageParam = Number(req.query.page || 1)
+    const limitParam = req.query.limit
+    const page = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam
+    const isAll = String(limitParam || '').toLowerCase() === 'all'
+    const perPage = isAll
+      ? null
+      : (() => {
+          const parsed = Number(limitParam || 50)
+          if (Number.isNaN(parsed) || parsed < 1) return 50
+          return Math.min(parsed, 200)
+        })()
 
     const where = {
       companyId: req.user.companyId,
@@ -123,16 +134,31 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res,
       ]
     }
 
-    const customers = await prisma.customer.findMany({
-      where,
-      include: {
-        area: { select: { id: true, name: true } },
-        customerType: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where,
+        include: {
+          area: { select: { id: true, name: true } },
+          customerType: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: perPage ? (page - 1) * perPage : undefined,
+        take: perPage || undefined,
+      }),
+      prisma.customer.count({ where }),
+    ])
 
-    res.json({ data: customers })
+    const totalPages = perPage ? Math.max(1, Math.ceil(total / perPage)) : 1
+
+    res.json({
+      data: customers,
+      meta: {
+        total,
+        page,
+        perPage: perPage || total || customers.length,
+        totalPages,
+      },
+    })
   } catch (error) {
     next(error)
   }

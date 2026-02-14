@@ -96,3 +96,5 @@
 - Feature: Added Excel bulk import for customers with area/type name mapping.
 
 - Feature: Added downloadable Excel template for customer bulk import.
+
+- Feature: Added customer list pagination with per-page options.

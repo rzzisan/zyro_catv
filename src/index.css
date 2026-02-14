@@ -1035,6 +1035,58 @@ a {
   flex-wrap: wrap;
 }
 
+.table-top-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.4rem;
+}
+
+.pagination-info {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.pagination-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pagination-select select {
+  border: 1px solid #e6e1d7;
+  border-radius: 12px;
+  padding: 0.35rem 0.7rem;
+  background: #fffaf2;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.page-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .data-cards {
   display: none;
   gap: 1rem;
