@@ -86,7 +86,7 @@ const customerUpdateSchema = z.object({
   customerTypeId: z.string().min(1),
   customerCode: z.string().min(2).max(40),
   name: z.string().min(2).max(120),
-  mobile: z.string().regex(bdMobileRegex),
+  mobile: z.string().regex(bdMobileRegex).or(z.literal('')),
   address: z.string().max(200).optional().nullable(),
   billingType: z.enum(['ACTIVE', 'FREE', 'CLOSED']),
   monthlyFee: z.number().int().nonnegative().optional().nullable(),
