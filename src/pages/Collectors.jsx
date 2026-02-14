@@ -7,12 +7,17 @@ const apiBase = import.meta.env.PROD
 
 function Collectors() {
   const [rows, setRows] = useState([])
+  const [areas, setAreas] = useState([])
   const [isOpen, setIsOpen] = useState(false)
+  const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [editingCollector, setEditingCollector] = useState(null)
+  const [assigningCollector, setAssigningCollector] = useState(null)
+  const [selectedAreas, setSelectedAreas] = useState([])
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState({ name: '', mobile: '', password: '' })
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [assignStatus, setAssignStatus] = useState('')
 
   const loadCollectors = async () => {
     const token = localStorage.getItem('auth_token')
@@ -35,8 +40,25 @@ function Collectors() {
     }
   }
 
+  const loadAreas = async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) return
+    try {
+      const response = await fetch(`${apiBase}/areas`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setAreas(data.data || [])
+      }
+    } catch (error) {
+      setStatus('এরিয়া লোড করা যায়নি')
+    }
+  }
+
   useEffect(() => {
     loadCollectors()
+    loadAreas()
   }, [])
 
   const openCreate = () => {
@@ -126,6 +148,49 @@ function Collectors() {
     setDeleteTarget(null)
   }
 
+  const openAssign = (row) => {
+    setAssigningCollector(row)
+    setSelectedAreas(row.areas ? row.areas.map((area) => area.id) : [])
+    setAssignStatus('')
+    setIsAssignOpen(true)
+  }
+
+  const toggleArea = (areaId) => {
+    setSelectedAreas((prev) =>
+      prev.includes(areaId) ? prev.filter((id) => id !== areaId) : [...prev, areaId]
+    )
+  }
+
+  const saveAssignments = async (event) => {
+    event.preventDefault()
+    if (!assigningCollector) return
+    const token = localStorage.getItem('auth_token')
+    if (!token) return
+    setIsLoading(true)
+    setAssignStatus('')
+    try {
+      const response = await fetch(`${apiBase}/users/collectors/${assigningCollector.id}/areas`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ areaIds: selectedAreas }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'এরিয়া সেট করা যায়নি')
+      }
+      setAssignStatus('সফলভাবে সেট হয়েছে')
+      setIsAssignOpen(false)
+      await loadCollectors()
+    } catch (error) {
+      setAssignStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <AppLayout title="কালেক্টর" subtitle="কালেক্টর তালিকা">
       <div className="module-card">
@@ -153,9 +218,12 @@ function Collectors() {
               <tr key={row.id}>
                 <td>{row.name}</td>
                 <td>{row.mobile}</td>
-                <td>—</td>
+                <td>{row.areas && row.areas.length ? row.areas.map((area) => area.name).join(', ') : '—'}</td>
                 <td>
                   <div className="action-stack">
+                    <button className="btn ghost" type="button" onClick={() => openAssign(row)}>
+                      এরিয়া সেটিং
+                    </button>
                     <button className="btn ghost" type="button" onClick={() => openEdit(row)}>
                       এডিট
                     </button>
@@ -251,6 +319,49 @@ function Collectors() {
           </div>
         </div>
         <button className="modal-backdrop" type="button" aria-label="Close" onClick={closeDelete} />
+      </div>
+
+      <div className={`modal-overlay ${isAssignOpen ? 'is-open' : ''}`}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <h3>কালেক্টর এরিয়া সেটিং</h3>
+            <button className="btn outline" type="button" onClick={() => setIsAssignOpen(false)}>
+              ✕
+            </button>
+          </div>
+          <form className="auth-form" onSubmit={saveAssignments}>
+            <div className="module-sub">
+              {assigningCollector?.name} এর জন্য এরিয়া নির্বাচন করুন
+            </div>
+            <div className="tag-grid">
+              {areas.map((area) => (
+                <label key={area.id} className="tag-option">
+                  <input
+                    type="checkbox"
+                    checked={selectedAreas.includes(area.id)}
+                    onChange={() => toggleArea(area.id)}
+                  />
+                  <span>{area.name}</span>
+                </label>
+              ))}
+            </div>
+            {assignStatus ? <div className="status-banner success">{assignStatus}</div> : null}
+            <div className="modal-actions">
+              <button className="btn ghost" type="button" onClick={() => setIsAssignOpen(false)}>
+                বন্ধ করুন
+              </button>
+              <button className="btn primary" type="submit" disabled={isLoading}>
+                {isLoading ? 'সেভ হচ্ছে...' : 'সেভ'}
+              </button>
+            </div>
+          </form>
+        </div>
+        <button className="modal-backdrop" type="button" aria-label="Close" onClick={() => setIsAssignOpen(false)} />
       </div>
     </AppLayout>
   )

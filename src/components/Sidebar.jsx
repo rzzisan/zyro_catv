@@ -16,7 +16,29 @@ const modules = [
   { label: 'টিউটোরিয়াল', to: '/tutorials' },
 ]
 
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
+}
+
 function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
+  const role = getUserRole()
+  const collectorHidden = new Set(['/areas', '/customer-types', '/collectors', '/managers'])
+  const visibleModules = modules.filter((item) => {
+    if (role === 'COLLECTOR' && collectorHidden.has(item.to)) {
+      return false
+    }
+    return true
+  })
+
   return (
     <>
       <aside
@@ -35,7 +57,7 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
         </button>
       </div>
       <nav className="sidebar-nav">
-        {modules.map((item) => (
+        {visibleModules.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

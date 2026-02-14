@@ -19,10 +19,17 @@ const userUpdateSchema = z.object({
   password: z.string().min(6).max(100).optional(),
 })
 
+const collectorAreaSchema = z.object({
+  areaIds: z.array(z.string().min(1)),
+})
+
 async function listUsersByRole(companyId, role) {
   const users = await prisma.user.findMany({
     where: { companyId, role },
     orderBy: { createdAt: 'desc' },
+    include: role === 'COLLECTOR'
+      ? { collectorAreas: { include: { area: { select: { id: true, name: true } } } } }
+      : undefined,
   })
 
   return users.map((user) => ({
@@ -30,6 +37,9 @@ async function listUsersByRole(companyId, role) {
     name: user.name,
     mobile: user.mobile,
     isActive: user.isActive,
+    areas: user.collectorAreas
+      ? user.collectorAreas.map((item) => item.area)
+      : undefined,
   }))
 }
 
@@ -220,6 +230,67 @@ router.delete('/collectors/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']),
     if (error.code === 'P2003') {
       return res.status(409).json({ error: 'Collector has related records' })
     }
+    return next(error)
+  }
+})
+
+router.get('/collectors/:id/areas', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const collector = await prisma.user.findFirst({
+      where: { id: req.params.id, companyId: req.user.companyId, role: 'COLLECTOR' },
+    })
+
+    if (!collector) {
+      return res.status(404).json({ error: 'Collector not found' })
+    }
+
+    const assignments = await prisma.collectorArea.findMany({
+      where: { collectorId: collector.id },
+      include: { area: { select: { id: true, name: true } } },
+    })
+
+    return res.json({
+      data: assignments.map((item) => item.area),
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.put('/collectors/:id/areas', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const parsed = collectorAreaSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
+    }
+
+    const collector = await prisma.user.findFirst({
+      where: { id: req.params.id, companyId: req.user.companyId, role: 'COLLECTOR' },
+    })
+
+    if (!collector) {
+      return res.status(404).json({ error: 'Collector not found' })
+    }
+
+    const areaIds = parsed.data.areaIds
+    const areas = await prisma.area.findMany({
+      where: { id: { in: areaIds }, companyId: req.user.companyId },
+      select: { id: true, name: true },
+    })
+
+    if (areas.length !== areaIds.length) {
+      return res.status(400).json({ error: 'Invalid area selection' })
+    }
+
+    await prisma.$transaction([
+      prisma.collectorArea.deleteMany({ where: { collectorId: collector.id } }),
+      prisma.collectorArea.createMany({
+        data: areaIds.map((areaId) => ({ collectorId: collector.id, areaId })),
+      }),
+    ])
+
+    return res.json({ data: areas })
+  } catch (error) {
     return next(error)
   }
 })

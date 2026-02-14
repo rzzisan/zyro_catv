@@ -1082,6 +1082,24 @@ a {
   color: var(--ink);
 }
 
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+}
+
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #efe5d6;
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  background: #fffaf2;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .page-buttons {
   display: flex;
   gap: 0.5rem;

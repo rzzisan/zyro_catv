@@ -65,6 +65,7 @@ model User {
   createdAreas       Area[]
   createdCustomerTypes CustomerType[]
   createdCustomers   Customer[]
+  collectorAreas     CollectorArea[]
 
   @@unique([companyId, mobile])
 }
@@ -95,8 +96,21 @@ model Area {
   company     Company    @relation(fields: [companyId], references: [id])
   createdBy   User?      @relation(fields: [createdById], references: [id])
   customers   Customer[]
+  collectorAssignments CollectorArea[]
 
   @@unique([companyId, name])
+}
+
+model CollectorArea {
+  id          String   @id @default(cuid())
+  collectorId String
+  areaId      String
+  createdAt   DateTime @default(now())
+  collector   User     @relation(fields: [collectorId], references: [id])
+  area        Area     @relation(fields: [areaId], references: [id])
+
+  @@unique([collectorId, areaId])
+  @@index([areaId])
 }
 
 model CustomerType {

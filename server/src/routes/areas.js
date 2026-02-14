@@ -15,8 +15,21 @@ const areaUpdateSchema = z.object({
 
 router.get('/', requireAuth, async (req, res, next) => {
   try {
+    const where = { companyId: req.user.companyId }
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      if (!areaIds.length) {
+        return res.json({ data: [] })
+      }
+      where.id = { in: areaIds }
+    }
+
     const areas = await prisma.area.findMany({
-      where: { companyId: req.user.companyId },
+      where,
       orderBy: { name: 'asc' },
     })
     res.json({ data: areas })

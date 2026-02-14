@@ -44,6 +44,9 @@ function Billing() {
     collectorId: '',
     q: '',
   })
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(50)
+  const [meta, setMeta] = useState({ total: 0, page: 1, perPage: 50, totalPages: 1 })
   const [summary, setSummary] = useState({
     totalCustomers: 0,
     totalDue: 0,
@@ -69,9 +72,15 @@ function Billing() {
     if (filters.status) params.append('status', filters.status)
     if (filters.collectorId) params.append('collectorId', filters.collectorId)
     if (filters.q) params.append('q', filters.q)
+    if (perPage === 'all') {
+      params.append('limit', 'all')
+    } else {
+      params.append('limit', String(perPage))
+      params.append('page', String(page))
+    }
     const query = params.toString()
     return query ? `?${query}` : ''
-  }, [filters])
+  }, [filters, page, perPage])
 
   const loadFilters = async () => {
     if (!token) return
@@ -105,6 +114,9 @@ function Billing() {
       setRows(data.data || [])
       setSummary(data.summary || summary)
       setPeriod(data.period || period)
+      if (data.meta) {
+        setMeta(data.meta)
+      }
     } catch (error) {
       setStatus(error.message)
     } finally {
@@ -119,6 +131,10 @@ function Billing() {
   useEffect(() => {
     loadBilling()
   }, [filterQuery])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filters, perPage])
 
   const openCollectModal = (row) => {
     const defaultAmount = row.dueCurrent > 0 ? row.dueCurrent : row.amount
@@ -222,7 +238,7 @@ function Billing() {
           <div>
             <div className="module-title">বিল তালিকা</div>
             <div className="module-sub">
-              মাস: {period.month || '-'} / {period.year || '-'} | মোট {summary.totalCustomers} জন
+              মাস: {period.month || '-'} / {period.year || '-'} | মোট {meta.total} জন
             </div>
           </div>
         </div>
@@ -297,6 +313,24 @@ function Billing() {
           </label>
         </div>
         {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
+        <div className="table-top-controls">
+          <label className="pagination-select">
+            <span>দেখাও</span>
+            <select
+              value={perPage}
+              onChange={(event) => {
+                const value = event.target.value
+                setPerPage(value === 'all' ? 'all' : Number(value))
+              }}
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value="all">সকল</option>
+            </select>
+          </label>
+        </div>
         <table className="data-table">
           <thead>
             <tr>
@@ -340,6 +374,29 @@ function Billing() {
             ))}
           </tbody>
         </table>
+        <div className="pagination-bar">
+          <div className="pagination-info">
+            পেজ {meta.page} / {meta.totalPages}
+          </div>
+          <div className="page-buttons">
+            <button
+              className="btn ghost small"
+              type="button"
+              disabled={perPage === 'all' || meta.page <= 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              আগের
+            </button>
+            <button
+              className="btn ghost small"
+              type="button"
+              disabled={perPage === 'all' || meta.page >= meta.totalPages}
+              onClick={() => setPage((prev) => Math.min(meta.totalPages, prev + 1))}
+            >
+              পরের
+            </button>
+          </div>
+        </div>
         {status ? <div className="status-banner error">{status}</div> : null}
       </div>
 

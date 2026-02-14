@@ -100,3 +100,7 @@
 - Feature: Added customer list pagination with per-page options.
 
 - Feature: Added billing page with filters, collection, and invoice printing.
+
+- Feature: Added billing list pagination with per-page options.
+
+- Feature: Added collector area assignment settings and access restrictions.

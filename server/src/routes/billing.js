@@ -34,14 +34,52 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
   try {
     const { month, year } = resolvePeriod(req.query)
     const { areaId, status, collectorId, q } = req.query
+    let collectorAreaIds = null
+    const pageParam = Number(req.query.page || 1)
+    const limitParam = req.query.limit
+    const isAll = String(limitParam || '').toLowerCase() === 'all'
+    const perPage = isAll
+      ? null
+      : (() => {
+          const parsed = Number(limitParam || 50)
+          if (Number.isNaN(parsed) || parsed < 1) return 50
+          return Math.min(parsed, 200)
+        })()
+    const page = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam
 
     const customerWhere = {
       companyId: req.user.companyId,
       billingType: 'ACTIVE',
     }
 
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      collectorAreaIds = assignments.map((item) => item.areaId)
+      if (!collectorAreaIds.length) {
+        return res.json({
+          data: [],
+          summary: { totalCustomers: 0, totalDue: 0, totalPaid: 0, totalAdvance: 0, monthAmount: 0 },
+          period: { month, year },
+          meta: { total: 0, page: 1, perPage: perPage || 0, totalPages: 1 },
+        })
+      }
+    }
+
     if (areaId) {
+      if (collectorAreaIds && !collectorAreaIds.includes(areaId)) {
+        return res.json({
+          data: [],
+          summary: { totalCustomers: 0, totalDue: 0, totalPaid: 0, totalAdvance: 0, monthAmount: 0 },
+          period: { month, year },
+          meta: { total: 0, page: 1, perPage: perPage || 0, totalPages: 1 },
+        })
+      }
       customerWhere.areaId = areaId
+    } else if (collectorAreaIds) {
+      customerWhere.areaId = { in: collectorAreaIds }
     }
 
     if (q) {
@@ -66,6 +104,7 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
         data: [],
         summary: { totalCustomers: 0, totalDue: 0, totalPaid: 0, totalAdvance: 0, monthAmount: 0 },
         period: { month, year },
+        meta: { total: 0, page: 1, perPage: perPage || 0, totalPages: 1 },
       })
     }
 
@@ -186,16 +225,28 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
       monthAmount += bill.amount
     }
 
+    const total = rows.length
+    const totalPages = perPage ? Math.max(1, Math.ceil(total / perPage)) : 1
+    const safePage = perPage ? Math.min(page, totalPages) : 1
+    const startIndex = perPage ? (safePage - 1) * perPage : 0
+    const pageRows = perPage ? rows.slice(startIndex, startIndex + perPage) : rows
+
     return res.json({
-      data: rows,
+      data: pageRows,
       summary: {
-        totalCustomers: rows.length,
+        totalCustomers: total,
         totalDue,
         totalPaid,
         totalAdvance,
         monthAmount,
       },
       period: { month, year },
+      meta: {
+        total,
+        page: safePage,
+        perPage: perPage || total || pageRows.length,
+        totalPages,
+      },
     })
   } catch (error) {
     next(error)

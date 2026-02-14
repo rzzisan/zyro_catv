@@ -94,9 +94,24 @@ const customerUpdateSchema = z.object({
   connectionDate: z.string().min(4),
 })
 
-router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
     const { areaId, customerTypeId, billingType, q } = req.query
+    let collectorAreaIds = null
+
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      collectorAreaIds = assignments.map((item) => item.areaId)
+      if (!collectorAreaIds.length) {
+        return res.json({
+          data: [],
+          meta: { total: 0, page: 1, perPage: 0, totalPages: 1 },
+        })
+      }
+    }
     const pageParam = Number(req.query.page || 1)
     const limitParam = req.query.limit
     const page = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam
@@ -114,7 +129,15 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res,
     }
 
     if (areaId) {
+      if (collectorAreaIds && !collectorAreaIds.includes(areaId)) {
+        return res.json({
+          data: [],
+          meta: { total: 0, page: 1, perPage: 0, totalPages: 1 },
+        })
+      }
       where.areaId = areaId
+    } else if (collectorAreaIds) {
+      where.areaId = { in: collectorAreaIds }
     }
 
     if (customerTypeId) {
