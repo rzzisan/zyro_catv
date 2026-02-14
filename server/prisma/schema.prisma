@@ -26,6 +26,12 @@ enum BillStatus {
   ADVANCE
 }
 
+enum DepositStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Package {
   id             String    @id @default(cuid())
   name           String
@@ -47,6 +53,7 @@ model Company {
   customerTypes CustomerType[]
   customers     Customer[]
   bills         Bill[]
+  deposits      Deposit[]
 }
 
 model User {
@@ -66,6 +73,8 @@ model User {
   createdCustomerTypes CustomerType[]
   createdCustomers   Customer[]
   collectorAreas     CollectorArea[]
+  deposits           Deposit[]        @relation("CollectorDeposits")
+  approvedDeposits   Deposit[]        @relation("ApproverDeposits")
 
   @@unique([companyId, mobile])
 }
@@ -177,4 +186,22 @@ model Payment {
   collectedById String?
   bill          Bill     @relation(fields: [billId], references: [id])
   collectedBy   User?    @relation(fields: [collectedById], references: [id])
+}
+
+model Deposit {
+  id           String        @id @default(cuid())
+  companyId    String
+  collectorId  String
+  amount       Int
+  status       DepositStatus @default(PENDING)
+  depositedAt  DateTime
+  approvedAt   DateTime?
+  approvedById String?
+  createdAt    DateTime      @default(now())
+  company      Company       @relation(fields: [companyId], references: [id])
+  collector    User          @relation("CollectorDeposits", fields: [collectorId], references: [id])
+  approvedBy   User?         @relation("ApproverDeposits", fields: [approvedById], references: [id])
+
+  @@index([companyId, status])
+  @@index([collectorId])
 }

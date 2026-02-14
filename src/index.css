@@ -696,6 +696,28 @@ a {
   margin-bottom: 1.6rem;
 }
 
+.tab-switch {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 2px solid #efe5d6;
+}
+
+.tab-button {
+  border: none;
+  background: transparent;
+  padding: 0.6rem 0.2rem 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-button.active {
+  color: var(--primary-strong);
+  border-bottom-color: var(--primary-strong);
+}
+
 .stat-card {
   background: var(--surface);
   border-radius: 18px;
