@@ -98,6 +98,11 @@ a {
   transform: translateY(-2px);
 }
 
+.btn.small {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+}
+
 .home-page {
   align-content: center;
 }
@@ -812,6 +817,12 @@ a {
 .table-action {
   color: var(--primary-strong);
   font-weight: 700;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .status-banner {

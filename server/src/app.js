@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth.js'
 import areaRoutes from './routes/areas.js'
+import customerTypeRoutes from './routes/customer-types.js'
+import customerRoutes from './routes/customers.js'
 import userRoutes from './routes/users.js'
 
 const app = express()
@@ -15,6 +17,8 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/areas', areaRoutes)
+app.use('/api/customer-types', customerTypeRoutes)
+app.use('/api/customers', customerRoutes)
 app.use('/api/users', userRoutes)
 
 app.use((err, req, res, next) => {

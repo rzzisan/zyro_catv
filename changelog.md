@@ -85,3 +85,10 @@
 - Fix: Removed invalid createdById field when creating managers/collectors.
 
 - Feature: Added logout button to topbar and token clear on logout.
+
+- Feature: Added customers API and UI with filters and create form.
+- Feature: Added customer type API for filter options.
+
+- Feature: Added customer type management page and sidebar menu.
+
+- Feature: Added customer type edit and delete actions.

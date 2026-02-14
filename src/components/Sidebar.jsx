@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const modules = [
   { label: 'ড্যাশবোর্ড', to: '/dashboard' },
   { label: 'এরিয়া', to: '/areas' },
+  { label: 'গ্রাহক টাইপ', to: '/customer-types' },
   { label: 'ম্যানেজার', to: '/managers' },
   { label: 'কালেক্টর', to: '/collectors' },
   { label: 'গ্রাহক', to: '/customers' },

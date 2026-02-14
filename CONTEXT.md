@@ -139,3 +139,6 @@ Backend:
 - Add manager permissions UI and permission save flow.
 - Add role-based frontend routing and protected routes.
 - Add area-collector relationship in data model and UI.
+
+## Workflow Preference
+- When updates are confirmed successful, commit and push all local changes.
