@@ -2,6 +2,12 @@ import jwt from 'jsonwebtoken'
 
 const jwtSecret = process.env.JWT_SECRET || 'dev_secret'
 
+/**
+ * Signs a JWT token with user payload
+ * @param {Object} payload - User data to include in the token (userId, role, companyId)
+ * @param {boolean} rememberMe - If true, token expires in 30 days; otherwise 7 days
+ * @returns {string} Signed JWT token
+ */
 export function signToken(payload, rememberMe = false) {
   const expiresIn = rememberMe ? '30d' : '7d'
   return jwt.sign(payload, jwtSecret, { expiresIn })
