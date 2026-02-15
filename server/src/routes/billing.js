@@ -334,6 +334,7 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
             name: true,
             customerCode: true,
             monthlyFee: true,
+            dueBalance: true,
             connectionDate: true,
             areaId: true,
           },
