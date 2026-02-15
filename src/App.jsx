@@ -14,6 +14,11 @@ import Home from './pages/Home.jsx'
 import InvoicePrint from './pages/InvoicePrint.jsx'
 import Managers from './pages/Managers.jsx'
 import Reports from './pages/Reports.jsx'
+import ReportsAllMonths from './pages/ReportsAllMonths.jsx'
+import ReportsDue from './pages/ReportsDue.jsx'
+import ReportsMessageLog from './pages/ReportsMessageLog.jsx'
+import ReportsPaymentMessage from './pages/ReportsPaymentMessage.jsx'
+import ReportsPreviousSummary from './pages/ReportsPreviousSummary.jsx'
 import Tutorials from './pages/Tutorials.jsx'
 
 function App() {
@@ -30,7 +35,13 @@ function App() {
         <Route path="/customer-types" element={<CustomerTypes />} />
         <Route path="/company-settings" element={<CompanySettings />} />
         <Route path="/billing" element={<Billing />} />
-        <Route path="/reports" element={<Reports />} />
+        <Route path="/reports" element={<Navigate to="/reports/current-month" replace />} />
+        <Route path="/reports/current-month" element={<Reports />} />
+        <Route path="/reports/all-months" element={<ReportsAllMonths />} />
+        <Route path="/reports/due" element={<ReportsDue />} />
+        <Route path="/reports/previous-summary" element={<ReportsPreviousSummary />} />
+        <Route path="/reports/payment-message" element={<ReportsPaymentMessage />} />
+        <Route path="/reports/message-log" element={<ReportsMessageLog />} />
         <Route path="/deposits" element={<Deposits />} />
         <Route path="/invoice/:billId" element={<InvoicePrint />} />
         <Route path="/expenses" element={<Expenses />} />

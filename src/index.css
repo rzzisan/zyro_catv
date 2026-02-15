@@ -490,6 +490,48 @@ a {
   gap: 0.4rem;
 }
 
+.sidebar-group {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sidebar-group-title {
+  background: transparent;
+  border: none;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.sidebar-sub {
+  display: none;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+  padding-left: 0.65rem;
+  border-left: 1px dashed rgba(101, 112, 137, 0.35);
+}
+
+.sidebar-group.is-open .sidebar-sub {
+  display: grid;
+}
+
+.sidebar.is-collapsed .sidebar-group-title {
+  display: none;
+}
+
+.sidebar.is-collapsed .sidebar-sub {
+  padding-left: 0;
+  border-left: none;
+}
+
 .nav-link {
   display: flex;
   align-items: center;
@@ -499,6 +541,16 @@ a {
   color: var(--muted);
   transition: background 0.2s ease, color 0.2s ease;
   font-size: 0.95rem;
+}
+
+.nav-icon {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .nav-link.active {
@@ -529,11 +581,7 @@ a {
 }
 
 .nav-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.6;
+  display: none;
 }
 
 .brand {

@@ -1,10 +1,29 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 import Topbar from './Topbar.jsx'
 
 function AppLayout({ title, subtitle, children }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('sidebar_collapsed')
+      if (stored === 'true') {
+        setIsCollapsed(true)
+      }
+    } catch (error) {
+      // Ignore storage issues and keep default layout.
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('sidebar_collapsed', isCollapsed ? 'true' : 'false')
+    } catch (error) {
+      // Ignore storage issues and keep UI responsive.
+    }
+  }, [isCollapsed])
 
   const handleToggleSidebar = () => {
     if (window.matchMedia('(max-width: 980px)').matches) {

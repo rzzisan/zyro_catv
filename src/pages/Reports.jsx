@@ -31,7 +31,7 @@ function Reports() {
   const [detailRows, setDetailRows] = useState([])
   const [collectors, setCollectors] = useState([])
   const [filters, setFilters] = useState({
-    mode: 'today',
+    mode: 'month',
     startDate: formatDateInput(new Date()),
     endDate: formatDateInput(new Date()),
     month: String(new Date().getMonth() + 1),
@@ -112,12 +112,12 @@ function Reports() {
   }, [filterQuery])
 
   return (
-    <AppLayout title="রিপোর্ট" subtitle="বিল কালেকশন রিপোর্ট">
+    <AppLayout title="রিপোর্ট" subtitle="বর্তমান মাসের বিল কালেকশন রিপোর্ট">
       <div className="module-card">
         <div className="module-header">
           <div>
             <div className="module-title">কালেকশন রিপোর্ট</div>
-            <div className="module-sub">ডিফল্টভাবে আজকের কালেকশন দেখায়</div>
+            <div className="module-sub">ডিফল্টভাবে চলতি মাসের কালেকশন দেখায়</div>
           </div>
         </div>
         <div className="metric-row">
