@@ -11,6 +11,8 @@ const normalizeStatus = (amount, paidTotal) => {
   return 'DUE'
 }
 
+const monthLabel = (year, month) => `${month}/${year}`
+
 router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
     const bill = await prisma.bill.findFirst({
@@ -55,12 +57,27 @@ router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
       }
     }
 
-    const paidTotal = bill.payments.reduce((sum, payment) => sum + payment.amount, 0)
+    const allocationRows = await prisma.paymentAllocation.findMany({
+      where: { billId: bill.id },
+      include: {
+        bill: { select: { periodMonth: true, periodYear: true } },
+      },
+    })
+    const paidTotal = allocationRows.reduce((sum, row) => sum + row.amount, 0)
     const dueCurrent = Math.max(0, bill.amount - paidTotal)
     const advanceAmount = paidTotal > bill.amount ? paidTotal - bill.amount : 0
     const totalDue = (bill.customer.dueBalance ?? 0) + dueCurrent
     const status = normalizeStatus(bill.amount, paidTotal)
     const lastPayment = bill.payments[0] || null
+
+    const lastPaymentAllocations = lastPayment
+      ? allocationRows.filter((row) => row.paymentId === lastPayment.id)
+      : []
+    const allocationMonths = lastPaymentAllocations.map((row) => ({
+      month: row.bill.periodMonth,
+      year: row.bill.periodYear,
+      label: monthLabel(row.bill.periodYear, row.bill.periodMonth),
+    }))
 
     const company = await prisma.company.findFirst({
       where: { id: req.user.companyId },
@@ -90,6 +107,7 @@ router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
         advanceAmount,
         totalDue,
         lastPayment,
+        allocationMonths,
         company,
       },
     })

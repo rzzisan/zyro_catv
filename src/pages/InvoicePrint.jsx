@@ -13,6 +13,11 @@ const formatDateTime = (value) => {
   return date.toLocaleString('bn-BD')
 }
 
+const formatMonths = (items = []) => {
+  if (!items.length) return '-'
+  return items.map((item) => item.label || `${item.month}/${item.year}`).join(', ')
+}
+
 function InvoicePrint() {
   const { billId } = useParams()
   const [data, setData] = useState(null)
@@ -66,7 +71,7 @@ function InvoicePrint() {
     )
   }
 
-  const { customer, bill, lastPayment } = data
+  const { customer, bill, lastPayment, allocationMonths } = data
   const collectorName = lastPayment?.collectedBy?.name || ''
 
   return (
@@ -81,6 +86,7 @@ function InvoicePrint() {
         {header.slogan ? <div className="header-sub">{header.slogan}</div> : null}
         {header.helpline ? <div className="header-sub">হেল্পলাইন: {header.helpline}</div> : null}
         <div className="line"><span className="muted">তারিখ</span><span>{formatDateTime(lastPayment?.paidAt || new Date())}</span></div>
+        <div className="line"><span className="muted">পরিশোধের মাস</span><span>{formatMonths(allocationMonths)}</span></div>
         <div className="line"><span className="muted">গ্রাহক</span><span>{customer?.name}</span></div>
         <div className="line"><span className="muted">আইডি</span><span>{customer?.customerCode}</span></div>
         <div className="line"><span className="muted">এরিয়া</span><span>{customer?.area?.name || '-'}</span></div>
