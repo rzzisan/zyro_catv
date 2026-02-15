@@ -11,6 +11,7 @@ const companyUpdateSchema = z.object({
   invoiceNote: z.string().max(500).optional().nullable(),
   slogan: z.string().max(120).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
+  billingSystem: z.enum(['POSTPAID', 'PREPAID']).optional(),
 })
 
 router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
@@ -24,6 +25,7 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
         invoiceNote: true,
         slogan: true,
         address: true,
+        billingSystem: true,
       },
     })
 
@@ -53,6 +55,7 @@ router.patch('/', requireAuth, requireRole(['ADMIN']), async (req, res, next) =>
         invoiceNote: payload.invoiceNote?.trim() || null,
         slogan: payload.slogan?.trim() || null,
         address: payload.address?.trim() || null,
+        billingSystem: payload.billingSystem || undefined,
       },
       select: {
         id: true,
@@ -61,6 +64,7 @@ router.patch('/', requireAuth, requireRole(['ADMIN']), async (req, res, next) =>
         invoiceNote: true,
         slogan: true,
         address: true,
+        billingSystem: true,
       },
     })
 

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 const jwtSecret = process.env.JWT_SECRET || 'dev_secret'
 
 export function signToken(payload) {
-  return jwt.sign(payload, jwtSecret, { expiresIn: '7d' })
+  return jwt.sign(payload, jwtSecret, { expiresIn: '30d' })
 }
 
 export function requireAuth(req, res, next) {

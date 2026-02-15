@@ -40,6 +40,39 @@ const formatDateTimeValue = (value) => {
 
 const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
 
+const formatMonthAllocations = (items = []) => {
+  if (!items.length) return '—'
+  return items
+    .map((item) => `${item.label || `${item.month}/${item.year}`} (${formatCurrency(item.amount)})`)
+    .join(', ')
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('bn-BD', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
+}
+
 function Billing() {
   const [rows, setRows] = useState([])
   const [areas, setAreas] = useState([])
@@ -71,6 +104,10 @@ function Billing() {
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [collecting, setCollecting] = useState(null)
+  const [historyFor, setHistoryFor] = useState(null)
+  const [historyRows, setHistoryRows] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyStatus, setHistoryStatus] = useState('')
   const [collectForm, setCollectForm] = useState({
     amount: '',
     paidAt: formatDateTimeValue(new Date()),
@@ -78,6 +115,7 @@ function Billing() {
   })
 
   const token = localStorage.getItem('auth_token')
+  const role = getUserRole()
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams()
@@ -210,6 +248,63 @@ function Billing() {
       setStatus(error.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadHistory = async (customerId) => {
+    if (!token || !customerId) return
+    setHistoryLoading(true)
+    setHistoryStatus('')
+    try {
+      const response = await fetch(`${apiBase}/billing/history/${customerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'হিস্টোরি লোড করা যায়নি')
+      }
+      setHistoryRows(data.data || [])
+    } catch (error) {
+      setHistoryStatus(error.message)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openHistoryModal = (row) => {
+    setHistoryFor(row)
+    loadHistory(row.customerId)
+  }
+
+  const closeHistoryModal = () => {
+    setHistoryFor(null)
+    setHistoryRows([])
+    setHistoryStatus('')
+  }
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!token || role !== 'ADMIN') return
+    const confirmed = window.confirm('আপনি কি এই কালেকশন ডিলিট করতে চান?')
+    if (!confirmed) return
+    setHistoryLoading(true)
+    setHistoryStatus('')
+    try {
+      const response = await fetch(`${apiBase}/billing/payments/${paymentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'ডিলিট ব্যর্থ হয়েছে')
+      }
+      if (historyFor) {
+        await loadHistory(historyFor.customerId)
+      }
+      await loadBilling()
+    } catch (error) {
+      setHistoryStatus(error.message)
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
@@ -351,6 +446,9 @@ function Billing() {
                     <button className="btn ghost small" type="button" onClick={() => openCollectModal(row)}>
                       কালেক্ট
                     </button>
+                    <button className="btn ghost small" type="button" onClick={() => openHistoryModal(row)}>
+                      হিস্টোরি
+                    </button>
                     <button className="btn outline small" type="button" onClick={() => handlePrint(row)}>
                       ইনভয়েস
                     </button>
@@ -454,6 +552,74 @@ function Billing() {
           ) : null}
         </div>
         <button className="modal-backdrop" type="button" aria-label="Close" onClick={() => setCollecting(null)} />
+      </div>
+
+      <div className={`modal-overlay ${historyFor ? 'is-open' : ''}`}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <h3>বিল হিস্টোরি</h3>
+            <button className="btn outline" type="button" onClick={closeHistoryModal}>
+              ✕
+            </button>
+          </div>
+          {historyFor ? (
+            <div>
+              <div className="module-sub">
+                {historyFor.name} ({historyFor.customerCode})
+              </div>
+              {historyLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
+              {!historyLoading && !historyRows.length ? (
+                <div className="module-sub">কোনো হিস্টোরি পাওয়া যায়নি</div>
+              ) : null}
+              {historyRows.length ? (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>তারিখ</th>
+                      <th>মাস সমন্বয়</th>
+                      <th>কালেক্টর</th>
+                      <th>মেথড</th>
+                      <th>পরিমাণ</th>
+                      <th>অ্যাকশন</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyRows.map((item) => (
+                      <tr key={item.paymentId}>
+                        <td>{formatDateTime(item.paidAt)}</td>
+                        <td>{formatMonthAllocations(item.months)}</td>
+                        <td>{item.collector?.name || '—'}</td>
+                        <td>{item.method || '—'}</td>
+                        <td>{formatCurrency(item.amount)}</td>
+                        <td>
+                          {role === 'ADMIN' ? (
+                            <button
+                              className="btn outline small"
+                              type="button"
+                              disabled={historyLoading}
+                              onClick={() => handleDeletePayment(item.paymentId)}
+                            >
+                              ডিলিট
+                            </button>
+                          ) : (
+                            <span className="cell-sub">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : null}
+              {historyStatus ? <div className="status-banner error">{historyStatus}</div> : null}
+            </div>
+          ) : null}
+        </div>
+        <button className="modal-backdrop" type="button" aria-label="Close" onClick={closeHistoryModal} />
       </div>
     </AppLayout>
   )

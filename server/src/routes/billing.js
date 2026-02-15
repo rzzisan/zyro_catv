@@ -19,6 +19,29 @@ const normalizeStatus = (amount, paidTotal) => {
   return 'DUE'
 }
 
+const toMonthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`
+
+const monthStart = (date) => new Date(date.getFullYear(), date.getMonth(), 1)
+
+const addMonths = (date, months) => {
+  const value = new Date(date)
+  value.setMonth(value.getMonth() + months)
+  return monthStart(value)
+}
+
+const buildMonthRange = (start, end) => {
+  const months = []
+  let cursor = monthStart(start)
+  const limit = monthStart(end)
+  while (cursor <= limit) {
+    months.push({ year: cursor.getFullYear(), month: cursor.getMonth() + 1 })
+    cursor = addMonths(cursor, 1)
+  }
+  return months
+}
+
+const monthLabel = (year, month) => `${month}/${year}`
+
 const resolvePeriod = (query) => {
   const now = new Date()
   const monthParam = Number(query.month)
@@ -170,6 +193,18 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
         })
       : bills
 
+    const billIds = finalBills.map((bill) => bill.id)
+    const allocationRows = billIds.length
+      ? await prisma.paymentAllocation.findMany({
+          where: { billId: { in: billIds } },
+          select: { billId: true, amount: true },
+        })
+      : []
+    const allocationMap = allocationRows.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+
     const customersById = new Map(customers.map((customer) => [customer.id, customer]))
     const rows = []
     let totalDue = 0
@@ -181,7 +216,7 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
       const customer = customersById.get(bill.customerId)
       if (!customer) continue
 
-      const paidTotal = bill.payments.reduce((sum, payment) => sum + payment.amount, 0)
+      const paidTotal = allocationMap[bill.id] || 0
       const billStatus = normalizeStatus(bill.amount, paidTotal)
 
       if (status && String(status).toUpperCase() !== billStatus) {
@@ -263,7 +298,18 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
     const payload = parsed.data
     const bill = await prisma.bill.findFirst({
       where: { id: payload.billId, companyId: req.user.companyId },
-      include: { customer: { select: { name: true, customerCode: true } } },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            customerCode: true,
+            monthlyFee: true,
+            connectionDate: true,
+            areaId: true,
+          },
+        },
+      },
     })
 
     if (!bill) {
@@ -275,9 +321,137 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
       return res.status(400).json({ error: 'Invalid paid date' })
     }
 
+    const company = await prisma.company.findFirst({
+      where: { id: req.user.companyId },
+      select: { billingSystem: true },
+    })
+
+    if (!bill.customer.monthlyFee || bill.customer.monthlyFee <= 0) {
+      return res.status(400).json({ error: 'Monthly fee is not set' })
+    }
+
+    const billingSystem = company?.billingSystem || 'POSTPAID'
+    const now = new Date()
+    const monthlyFee = bill.customer.monthlyFee
+
+    let monthTargets = []
+    if (billingSystem === 'POSTPAID') {
+      const startDate = monthStart(new Date(bill.customer.connectionDate))
+      const endDate = monthStart(now)
+      monthTargets = buildMonthRange(startDate, endDate)
+    } else {
+      const startDate = monthStart(now)
+      const monthsNeeded = Math.max(1, Math.ceil(payload.amount / monthlyFee))
+      monthTargets = Array.from({ length: monthsNeeded }).map((_, index) => {
+        const date = addMonths(startDate, index)
+        return { year: date.getFullYear(), month: date.getMonth() + 1 }
+      })
+    }
+
+    if (!monthTargets.length) {
+      return res.status(400).json({ error: 'No billing months available' })
+    }
+
+    const monthConditions = monthTargets.map((item) => ({
+      periodMonth: item.month,
+      periodYear: item.year,
+    }))
+
+    const existingBills = await prisma.bill.findMany({
+      where: {
+        customerId: bill.customer.id,
+        OR: monthConditions,
+      },
+    })
+
+    const existingMap = new Map(
+      existingBills.map((item) => [toMonthKey(item.periodYear, item.periodMonth), item])
+    )
+
+    const missingTargets = monthTargets.filter(
+      (item) => !existingMap.has(toMonthKey(item.year, item.month))
+    )
+
+    if (missingTargets.length) {
+      await prisma.bill.createMany({
+        data: missingTargets.map((item) => ({
+          companyId: req.user.companyId,
+          customerId: bill.customer.id,
+          periodMonth: item.month,
+          periodYear: item.year,
+          amount: monthlyFee,
+          status: 'DUE',
+        })),
+      })
+    }
+
+    let billsForPayment = await prisma.bill.findMany({
+      where: {
+        customerId: bill.customer.id,
+        OR: monthConditions,
+      },
+      orderBy: [
+        { periodYear: 'asc' },
+        { periodMonth: 'asc' },
+      ],
+    })
+
+    let remaining = payload.amount
+    const allocations = []
+
+    const paidRows = await prisma.paymentAllocation.findMany({
+      where: { billId: { in: billsForPayment.map((item) => item.id) } },
+      select: { billId: true, amount: true },
+    })
+    const paidMap = paidRows.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+
+    for (const target of billsForPayment) {
+      if (remaining <= 0) break
+      const alreadyPaid = paidMap[target.id] || 0
+      const available = Math.max(0, target.amount - alreadyPaid)
+      if (available <= 0) continue
+      const applied = Math.min(available, remaining)
+      allocations.push({ billId: target.id, amount: applied })
+      remaining -= applied
+    }
+
+    if (remaining > 0) {
+      let safety = 0
+      let cursorDate = monthTargets.length
+        ? addMonths(monthStart(new Date(monthTargets[monthTargets.length - 1].year, monthTargets[monthTargets.length - 1].month - 1, 1)), 1)
+        : monthStart(now)
+
+      while (remaining > 0 && safety < 24) {
+        const year = cursorDate.getFullYear()
+        const month = cursorDate.getMonth() + 1
+        const newBill = await prisma.bill.create({
+          data: {
+            companyId: req.user.companyId,
+            customerId: bill.customer.id,
+            periodMonth: month,
+            periodYear: year,
+            amount: monthlyFee,
+            status: 'DUE',
+          },
+        })
+        const applied = Math.min(monthlyFee, remaining)
+        allocations.push({ billId: newBill.id, amount: applied })
+        remaining -= applied
+        cursorDate = addMonths(cursorDate, 1)
+        safety += 1
+      }
+    }
+
+    if (!allocations.length) {
+      return res.status(400).json({ error: 'No payable bills found' })
+    }
+
     const payment = await prisma.payment.create({
       data: {
-        billId: bill.id,
+        billId: allocations[0].billId,
         amount: payload.amount,
         paidAt,
         method: payload.method ? payload.method.trim() : null,
@@ -285,28 +459,156 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
       },
     })
 
-    const totals = await prisma.payment.aggregate({
-      where: { billId: bill.id },
-      _sum: { amount: true },
+    await prisma.paymentAllocation.createMany({
+      data: allocations.map((item) => ({
+        paymentId: payment.id,
+        billId: item.billId,
+        amount: item.amount,
+      })),
     })
 
-    const paidTotal = totals._sum.amount || 0
-    const newStatus = normalizeStatus(bill.amount, paidTotal)
-
-    await prisma.bill.update({
-      where: { id: bill.id },
-      data: { status: newStatus },
+    const affectedBillIds = allocations.map((item) => item.billId)
+    const totalsByBill = await prisma.paymentAllocation.findMany({
+      where: { billId: { in: affectedBillIds } },
+      select: { billId: true, amount: true },
     })
+    const totalMap = totalsByBill.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+
+    const affectedBills = await prisma.bill.findMany({
+      where: { id: { in: affectedBillIds } },
+      select: { id: true, amount: true },
+    })
+
+    await prisma.$transaction(
+      affectedBills.map((item) =>
+        prisma.bill.update({
+          where: { id: item.id },
+          data: { status: normalizeStatus(item.amount, totalMap[item.id] || 0) },
+        })
+      )
+    )
 
     return res.json({
       data: {
         billId: bill.id,
         customer: bill.customer,
         payment,
-        paidTotal,
-        status: newStatus,
+        allocations: allocations.map((item) => ({
+          billId: item.billId,
+          amount: item.amount,
+        })),
       },
     })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.get('/history/:customerId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
+  try {
+    const customer = await prisma.customer.findFirst({
+      where: { id: req.params.customerId, companyId: req.user.companyId },
+      select: { id: true, areaId: true },
+    })
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      if (!areaIds.includes(customer.areaId)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+    }
+
+    const allocations = await prisma.paymentAllocation.findMany({
+      where: { bill: { customerId: customer.id, companyId: req.user.companyId } },
+      include: {
+        payment: { select: { id: true, amount: true, paidAt: true, method: true, collectedBy: { select: { id: true, name: true } } } },
+        bill: { select: { periodMonth: true, periodYear: true } },
+      },
+      orderBy: { payment: { paidAt: 'desc' } },
+    })
+
+    const grouped = new Map()
+    allocations.forEach((item) => {
+      if (!grouped.has(item.payment.id)) {
+        grouped.set(item.payment.id, {
+          paymentId: item.payment.id,
+          amount: item.payment.amount,
+          paidAt: item.payment.paidAt,
+          method: item.payment.method,
+          collector: item.payment.collectedBy,
+          months: [],
+        })
+      }
+      grouped.get(item.payment.id).months.push({
+        month: item.bill.periodMonth,
+        year: item.bill.periodYear,
+        amount: item.amount,
+        label: monthLabel(item.bill.periodYear, item.bill.periodMonth),
+      })
+    })
+
+    return res.json({ data: Array.from(grouped.values()) })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.findFirst({
+      where: { id: req.params.paymentId, bill: { companyId: req.user.companyId } },
+    })
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment not found' })
+    }
+
+    const allocations = await prisma.paymentAllocation.findMany({
+      where: { paymentId: payment.id },
+      select: { billId: true },
+    })
+
+    const billIds = allocations.map((item) => item.billId)
+
+    await prisma.payment.delete({ where: { id: payment.id } })
+
+    if (billIds.length) {
+      const totalsByBill = await prisma.paymentAllocation.findMany({
+        where: { billId: { in: billIds } },
+        select: { billId: true, amount: true },
+      })
+      const totalMap = totalsByBill.reduce((acc, row) => {
+        acc[row.billId] = (acc[row.billId] || 0) + row.amount
+        return acc
+      }, {})
+
+      const affectedBills = await prisma.bill.findMany({
+        where: { id: { in: billIds } },
+        select: { id: true, amount: true },
+      })
+
+      await prisma.$transaction(
+        affectedBills.map((item) =>
+          prisma.bill.update({
+            where: { id: item.id },
+            data: { status: normalizeStatus(item.amount, totalMap[item.id] || 0) },
+          })
+        )
+      )
+    }
+
+    return res.json({ ok: true })
   } catch (error) {
     return next(error)
   }

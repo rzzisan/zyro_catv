@@ -32,6 +32,11 @@ enum DepositStatus {
   REJECTED
 }
 
+enum BillingSystem {
+  POSTPAID
+  PREPAID
+}
+
 model Package {
   id             String    @id @default(cuid())
   name           String
@@ -49,6 +54,7 @@ model Company {
   invoiceNote   String?        @db.Text
   slogan        String?
   address       String?        @db.Text
+  billingSystem BillingSystem  @default(POSTPAID)
   packageId     String?
   createdAt     DateTime       @default(now())
   package       Package?       @relation(fields: [packageId], references: [id])
@@ -176,6 +182,7 @@ model Bill {
   company     Company    @relation(fields: [companyId], references: [id])
   customer    Customer   @relation(fields: [customerId], references: [id])
   payments    Payment[]
+  allocations PaymentAllocation[]
 
   @@unique([customerId, periodMonth, periodYear])
   @@index([companyId, status])
@@ -190,6 +197,20 @@ model Payment {
   collectedById String?
   bill          Bill     @relation(fields: [billId], references: [id])
   collectedBy   User?    @relation(fields: [collectedById], references: [id])
+  allocations   PaymentAllocation[]
+}
+
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  billId    String
+  amount    Int
+  createdAt DateTime @default(now())
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  bill      Bill     @relation(fields: [billId], references: [id])
+
+  @@index([billId])
+  @@index([paymentId])
 }
 
 model Deposit {

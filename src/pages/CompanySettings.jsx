@@ -12,6 +12,7 @@ function CompanySettings() {
     invoiceNote: '',
     slogan: '',
     address: '',
+    billingSystem: 'POSTPAID',
   })
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -37,6 +38,7 @@ function CompanySettings() {
         invoiceNote: company.invoiceNote || '',
         slogan: company.slogan || '',
         address: company.address || '',
+        billingSystem: company.billingSystem || 'POSTPAID',
       })
     } catch (error) {
       setStatus(error.message)
@@ -67,6 +69,7 @@ function CompanySettings() {
           invoiceNote: form.invoiceNote || null,
           slogan: form.slogan || null,
           address: form.address || null,
+          billingSystem: form.billingSystem,
         }),
       })
       const data = await response.json()
@@ -110,6 +113,16 @@ function CompanySettings() {
                 onChange={(event) => setForm((prev) => ({ ...prev, helplineNumber: event.target.value }))}
                 placeholder="01XXXXXXXXX"
               />
+            </label>
+            <label className="field">
+              <span>বিলিং সিস্টেম</span>
+              <select
+                value={form.billingSystem}
+                onChange={(event) => setForm((prev) => ({ ...prev, billingSystem: event.target.value }))}
+              >
+                <option value="POSTPAID">পোস্টপেইড</option>
+                <option value="PREPAID">প্রিপেইড</option>
+              </select>
             </label>
             <label className="field">
               <span>শ্লোগান</span>
