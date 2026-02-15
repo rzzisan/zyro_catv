@@ -40,6 +40,17 @@ const buildMonthRange = (start, end) => {
   return months
 }
 
+const buildTrailingMonths = (endDate, count) => {
+  const months = []
+  const endMonth = monthStart(endDate)
+  const total = Math.max(1, count)
+  for (let index = total - 1; index >= 0; index -= 1) {
+    const cursor = addMonths(endMonth, -index)
+    months.push({ year: cursor.getFullYear(), month: cursor.getMonth() + 1 })
+  }
+  return months
+}
+
 const monthNames = [
   'জানুয়ারি',
   'ফেব্রুয়ারি',
@@ -354,9 +365,10 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
 
     let monthTargets = []
     if (billingSystem === 'POSTPAID') {
-      const startDate = monthStart(new Date(bill.customer.connectionDate))
-      const endDate = monthStart(now)
-      monthTargets = buildMonthRange(startDate, endDate)
+      const endDate = addMonths(monthStart(now), -1)
+      const totalDue = (bill.customer.dueBalance || 0) + bill.amount
+      const dueMonths = Math.max(1, Math.ceil(totalDue / monthlyFee))
+      monthTargets = buildTrailingMonths(endDate, dueMonths)
     } else {
       const startDate = monthStart(now)
       const monthsNeeded = Math.max(1, Math.ceil(payload.amount / monthlyFee))
