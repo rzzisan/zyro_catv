@@ -234,6 +234,29 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
       return acc
     }, {})
 
+    const allBills = await prisma.bill.findMany({
+      where: { customerId: { in: customerIds } },
+      select: { id: true, customerId: true, amount: true },
+    })
+    const allBillIds = allBills.map((item) => item.id)
+    const allAllocations = allBillIds.length
+      ? await prisma.paymentAllocation.findMany({
+          where: { billId: { in: allBillIds } },
+          select: { billId: true, amount: true },
+        })
+      : []
+    const allAllocationsByBill = allAllocations.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+    const customerTotals = new Map()
+    allBills.forEach((item) => {
+      const existing = customerTotals.get(item.customerId) || { totalAmount: 0, paidTotal: 0 }
+      existing.totalAmount += item.amount
+      existing.paidTotal += allAllocationsByBill[item.id] || 0
+      customerTotals.set(item.customerId, existing)
+    })
+
     const customersById = new Map(customers.map((customer) => [customer.id, customer]))
     const rows = []
     let totalDue = 0
@@ -245,8 +268,11 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
       const customer = customersById.get(bill.customerId)
       if (!customer) continue
 
-      const paidTotal = allocationMap[bill.id] || 0
-      const billStatus = normalizeStatus(bill.amount, paidTotal)
+      const billPaidTotal = allocationMap[bill.id] || 0
+      const totals = customerTotals.get(customer.id) || { totalAmount: bill.amount, paidTotal: billPaidTotal }
+      const paidTotal = totals.paidTotal
+      const totalAmount = totals.totalAmount
+      const billStatus = normalizeStatus(totalAmount, paidTotal)
 
       if (status && String(status).toUpperCase() !== billStatus) {
         continue
@@ -259,9 +285,9 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
         if (!matchesCollector) continue
       }
 
-      const dueCurrent = Math.max(0, bill.amount - paidTotal)
-      const advanceAmount = paidTotal > bill.amount ? paidTotal - bill.amount : 0
-      const totalDueAmount = (customer.dueBalance ?? 0) + dueCurrent
+      const dueCurrent = Math.max(0, bill.amount - billPaidTotal)
+      const advanceAmount = paidTotal > totalAmount ? paidTotal - totalAmount : 0
+      const totalDueAmount = Math.max(0, totalAmount - paidTotal)
       const lastPayment = bill.payments[0] || null
 
       rows.push({

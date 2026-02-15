@@ -85,16 +85,52 @@ router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
         { bill: { periodMonth: 'asc' } },
       ],
     })
-    const paidTotal = allocationRows.reduce((sum, row) => sum + row.amount, 0)
-    const dueCurrent = Math.max(0, bill.amount - paidTotal)
-    const advanceAmount = paidTotal > bill.amount ? paidTotal - bill.amount : 0
-    const totalDue = (bill.customer.dueBalance ?? 0) + dueCurrent
-    const status = normalizeStatus(bill.amount, paidTotal)
-    const lastPayment = bill.payments[0] || null
+    const lastPayment = await prisma.payment.findFirst({
+      where: { bill: { customerId: bill.customer.id, companyId: req.user.companyId } },
+      orderBy: { paidAt: 'desc' },
+      select: {
+        id: true,
+        amount: true,
+        paidAt: true,
+        method: true,
+        collectedBy: { select: { id: true, name: true } },
+      },
+    })
 
     const lastPaymentAllocations = lastPayment
-      ? allocationRows.filter((row) => row.paymentId === lastPayment.id)
+      ? await prisma.paymentAllocation.findMany({
+          where: { paymentId: lastPayment.id },
+          include: { bill: { select: { periodMonth: true, periodYear: true } } },
+          orderBy: [
+            { bill: { periodYear: 'asc' } },
+            { bill: { periodMonth: 'asc' } },
+          ],
+        })
       : []
+
+    const paidTotal = lastPaymentAllocations.reduce((sum, row) => sum + row.amount, 0)
+
+    const allBills = await prisma.bill.findMany({
+      where: { customerId: bill.customer.id },
+      select: { id: true, amount: true },
+    })
+    const allBillIds = allBills.map((item) => item.id)
+    const allAllocations = allBillIds.length
+      ? await prisma.paymentAllocation.findMany({
+          where: { billId: { in: allBillIds } },
+          select: { billId: true, amount: true },
+        })
+      : []
+    const allocationsByBill = allAllocations.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+    const totalAmount = allBills.reduce((sum, item) => sum + item.amount, 0)
+    const totalPaid = allBills.reduce((sum, item) => sum + (allocationsByBill[item.id] || 0), 0)
+    const totalDue = Math.max(0, totalAmount - totalPaid)
+    const dueCurrent = Math.max(0, bill.amount - (allocationsByBill[bill.id] || 0))
+    const advanceAmount = totalPaid > totalAmount ? totalPaid - totalAmount : 0
+    const status = normalizeStatus(totalAmount, totalPaid)
     const allocationMonths = lastPaymentAllocations.map((row) => ({
       month: row.bill.periodMonth,
       year: row.bill.periodYear,
