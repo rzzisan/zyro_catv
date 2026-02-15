@@ -11,7 +11,25 @@ const normalizeStatus = (amount, paidTotal) => {
   return 'DUE'
 }
 
-const monthLabel = (year, month) => `${month}/${year}`
+const monthNames = [
+  'জানুয়ারি',
+  'ফেব্রুয়ারি',
+  'মার্চ',
+  'এপ্রিল',
+  'মে',
+  'জুন',
+  'জুলাই',
+  'আগস্ট',
+  'সেপ্টেম্বর',
+  'অক্টোবর',
+  'নভেম্বর',
+  'ডিসেম্বর',
+]
+
+const monthLabel = (year, month) => {
+  const name = monthNames[month - 1] || String(month)
+  return `${name} ${year}`
+}
 
 router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
@@ -62,6 +80,10 @@ router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
       include: {
         bill: { select: { periodMonth: true, periodYear: true } },
       },
+      orderBy: [
+        { bill: { periodYear: 'asc' } },
+        { bill: { periodMonth: 'asc' } },
+      ],
     })
     const paidTotal = allocationRows.reduce((sum, row) => sum + row.amount, 0)
     const dueCurrent = Math.max(0, bill.amount - paidTotal)

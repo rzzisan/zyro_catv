@@ -40,7 +40,25 @@ const buildMonthRange = (start, end) => {
   return months
 }
 
-const monthLabel = (year, month) => `${month}/${year}`
+const monthNames = [
+  'জানুয়ারি',
+  'ফেব্রুয়ারি',
+  'মার্চ',
+  'এপ্রিল',
+  'মে',
+  'জুন',
+  'জুলাই',
+  'আগস্ট',
+  'সেপ্টেম্বর',
+  'অক্টোবর',
+  'নভেম্বর',
+  'ডিসেম্বর',
+]
+
+const monthLabel = (year, month) => {
+  const name = monthNames[month - 1] || String(month)
+  return `${name} ${year}`
+}
 
 const resolvePeriod = (query) => {
   const now = new Date()
