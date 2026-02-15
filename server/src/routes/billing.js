@@ -458,8 +458,16 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
       while (remaining > 0 && safety < 24) {
         const year = cursorDate.getFullYear()
         const month = cursorDate.getMonth() + 1
-        const newBill = await prisma.bill.create({
-          data: {
+        const newBill = await prisma.bill.upsert({
+          where: {
+            customerId_periodMonth_periodYear: {
+              customerId: bill.customer.id,
+              periodMonth: month,
+              periodYear: year,
+            },
+          },
+          update: {},
+          create: {
             companyId: req.user.companyId,
             customerId: bill.customer.id,
             periodMonth: month,
