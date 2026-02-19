@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Areas from './pages/Areas.jsx'
 import Billing from './pages/Billing.jsx'
+import CollectorBilling from './pages/CollectorBilling.jsx'
 import Collectors from './pages/Collectors.jsx'
 import Customers from './pages/Customers.jsx'
 import CustomerTypes from './pages/CustomerTypes.jsx'
@@ -35,6 +36,7 @@ function App() {
         <Route path="/customer-types" element={<CustomerTypes />} />
         <Route path="/company-settings" element={<CompanySettings />} />
         <Route path="/billing" element={<Billing />} />
+        <Route path="/collector-billing" element={<CollectorBilling />} />
         <Route path="/reports" element={<Navigate to="/reports/current-month" replace />} />
         <Route path="/reports/current-month" element={<Reports />} />
         <Route path="/reports/all-months" element={<ReportsAllMonths />} />
