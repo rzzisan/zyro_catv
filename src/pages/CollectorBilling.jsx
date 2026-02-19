@@ -145,11 +145,19 @@ function CollectorBilling() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const token = localStorage.getItem('auth_token')
+
   // Fetch areas on mount
   useEffect(() => {
     const fetchAreas = async () => {
+      if (!token) {
+        setError('অথেন্টিকেশন প্রয়োজন')
+        return
+      }
       try {
-        const res = await fetch(`${apiBase}/areas`)
+        const res = await fetch(`${apiBase}/areas`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (!res.ok) throw new Error('Failed to fetch areas')
         const data = await res.json()
         setAreas(data.data || [])
@@ -161,11 +169,11 @@ function CollectorBilling() {
       }
     }
     fetchAreas()
-  }, [])
+  }, [token])
 
   // Fetch customers when area or status changes
   useEffect(() => {
-    if (!selectedArea) return
+    if (!selectedArea || !token) return
 
     const fetchCustomers = async () => {
       setLoading(true)
@@ -176,7 +184,9 @@ function CollectorBilling() {
           status: selectedStatus,
           perPage: 1000,
         })
-        const res = await fetch(`${apiBase}/billing?${params}`)
+        const res = await fetch(`${apiBase}/billing?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (!res.ok) throw new Error('Failed to fetch customers')
         const data = await res.json()
         setCustomers(data.data || [])
@@ -188,7 +198,7 @@ function CollectorBilling() {
     }
 
     fetchCustomers()
-  }, [selectedArea, selectedStatus])
+  }, [selectedArea, selectedStatus, token])
 
   const handleBillCollect = (customer) => {
     // Get the latest bill for this customer and navigate to invoice
