@@ -85,18 +85,28 @@ const MenuDialog = ({ customer, onClose, onBillCollect, onBillReport, onCall }) 
   )
 }
 
-// Customer Card Component
-const CustomerCard = ({ customer, onMenuClick }) => {
+// Customer List Item Component
+const CustomerListItem = ({ customer, onMenuClick }) => {
   const [showMenu, setShowMenu] = useState(false)
 
   return (
-    <div className="collector-customer-card">
-      <div className="customer-info">
-        <div className="customer-header">
-          <div>
+    <>
+      <div className="collector-customer-row">
+        <div className="customer-main-info">
+          <div className="customer-name-id">
             <h4 className="customer-name">{customer.name}</h4>
-            <p className="customer-id">আইডি: {customer.id}</p>
+            <span className="customer-id">{customer.id}</span>
           </div>
+          <div className="customer-contact-info">
+            <span className="contact-label">📍</span>
+            <span className="contact-value">{customer.address || '—'}</span>
+            <span className="contact-label">📱</span>
+            <span className="contact-value">{customer.phone || '—'}</span>
+          </div>
+        </div>
+
+        <div className="customer-right-section">
+          <div className="due-amount">{formatCurrency(customer.totalDue)}</div>
           <button
             className="menu-button"
             onClick={() => setShowMenu(!showMenu)}
@@ -104,22 +114,6 @@ const CustomerCard = ({ customer, onMenuClick }) => {
           >
             ⋮
           </button>
-        </div>
-
-        <div className="customer-details">
-          <div className="detail-row">
-            <span className="detail-label">📍 ঠিকানা:</span>
-            <span className="detail-value">{customer.address || '—'}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">📱 ফোন:</span>
-            <span className="detail-value">{customer.phone || '—'}</span>
-          </div>
-        </div>
-
-        <div className="customer-due">
-          <span className="due-label">মোট বকেয়া:</span>
-          <span className="due-amount">{formatCurrency(customer.totalDue)}</span>
         </div>
       </div>
 
@@ -132,7 +126,7 @@ const CustomerCard = ({ customer, onMenuClick }) => {
           onCall={onMenuClick.onCall}
         />
       )}
-    </div>
+    </>
   )
 }
 
@@ -237,7 +231,7 @@ function CollectorBilling() {
         {/* Area Selector */}
         <div className="area-selector-section">
           <label htmlFor="area-select" className="area-label">
-            এরিয়া নির্বাচন করুন:
+            এরিয়া:
           </label>
           <select
             id="area-select"
@@ -292,9 +286,9 @@ function CollectorBilling() {
           )}
 
           {!loading && customers.length > 0 && (
-            <div className="customer-grid">
+            <div className="customer-list">
               {customers.map((customer) => (
-                <CustomerCard
+                <CustomerListItem
                   key={customer.id}
                   customer={customer}
                   onMenuClick={menuHandlers}
@@ -309,3 +303,4 @@ function CollectorBilling() {
 }
 
 export default CollectorBilling
+
