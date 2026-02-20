@@ -221,6 +221,8 @@ const getUserRole = () => {
 function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
   const location = useLocation()
   const role = getUserRole()
+  const [companyName, setCompanyName] = useState('Zyrotech CATV')
+  const [companySlogan, setCompanySlogan] = useState('billing Managment')
   const collectorHidden = new Set([
     '/areas',
     '/customer-types',
@@ -248,6 +250,30 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
     }
   }, [isReportActive])
 
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) return
+
+        const response = await fetch('/api/company', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const result = await response.json()
+          setCompanyName(result.data.name)
+          setCompanySlogan(result.data.slogan || 'billing Managment')
+        }
+      } catch (error) {
+        console.error('Failed to fetch company info:', error)
+      }
+    }
+
+    fetchCompanyInfo()
+  }, [])
+
   return (
     <>
       <aside
@@ -258,8 +284,8 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
         <div className="sidebar-brand">
         <div className="brand-mark">ZY</div>
         <div>
-          <div className="brand-title">Zyrotech CATV</div>
-          <div className="brand-sub">billing Managment</div>
+          <div className="brand-title">{companyName}</div>
+          <div className="brand-sub">{companySlogan}</div>
         </div>
         <button className="sidebar-close" type="button" onClick={onClose}>
           ✕
