@@ -23,6 +23,21 @@ const collectorAreaSchema = z.object({
   areaIds: z.array(z.string().min(1)),
 })
 
+const selfUpdateSchema = z.object({
+  name: z.string().min(2).max(80),
+  mobile: z.string().regex(bdMobileRegex),
+  currentPassword: z.string().min(6).max(100).optional(),
+  newPassword: z.string().min(6).max(100).optional(),
+}).refine(
+  (data) =>
+    (data.currentPassword && data.newPassword)
+    || (!data.currentPassword && !data.newPassword),
+  {
+    message: 'Current and new password required',
+    path: ['newPassword'],
+  }
+)
+
 async function listUsersByRole(companyId, role) {
   const users = await prisma.user.findMany({
     where: { companyId, role },
@@ -93,6 +108,79 @@ async function updateUser(companyId, role, userId, payload) {
     isActive: user.isActive,
   }
 }
+
+router.get('/me', requireAuth, async (req, res, next) => {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { id: req.user.userId, companyId: req.user.companyId },
+    })
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    return res.json({
+      data: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.patch('/me', requireAuth, async (req, res, next) => {
+  try {
+    const parsed = selfUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: { id: req.user.userId, companyId: req.user.companyId },
+    })
+
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const updateData = {
+      name: parsed.data.name,
+      mobile: parsed.data.mobile,
+    }
+
+    if (parsed.data.newPassword) {
+      const matches = await bcrypt.compare(parsed.data.currentPassword, existing.passwordHash)
+      if (!matches) {
+        return res.status(400).json({ error: 'Current password is incorrect' })
+      }
+
+      updateData.passwordHash = await bcrypt.hash(parsed.data.newPassword, 10)
+    }
+
+    const user = await prisma.user.update({
+      where: { id: existing.id },
+      data: updateData,
+    })
+
+    return res.json({
+      data: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+      },
+    })
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Mobile already registered' })
+    }
+    return next(error)
+  }
+})
 
 router.get('/managers', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
   try {

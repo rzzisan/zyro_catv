@@ -20,6 +20,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   mobile: z.string().regex(bdMobileRegex),
   password: z.string().min(6).max(100),
+  rememberMe: z.boolean().optional(),
 })
 
 router.post('/register-company', async (req, res) => {
@@ -90,7 +91,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
   }
 
-  const { mobile, password } = parsed.data
+  const { mobile, password, rememberMe } = parsed.data
 
   const user = await prisma.user.findFirst({
     where: {
@@ -112,7 +113,7 @@ router.post('/login', async (req, res) => {
     userId: user.id,
     role: user.role,
     companyId: user.companyId,
-  })
+  }, { expiresIn: rememberMe ? '90d' : '30d' })
 
   return res.json({
     token,

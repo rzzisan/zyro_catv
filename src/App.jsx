@@ -21,6 +21,7 @@ import ReportsMessageLog from './pages/ReportsMessageLog.jsx'
 import ReportsPaymentMessage from './pages/ReportsPaymentMessage.jsx'
 import ReportsPreviousSummary from './pages/ReportsPreviousSummary.jsx'
 import Tutorials from './pages/Tutorials.jsx'
+import UserProfile from './pages/UserProfile.jsx'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<UserProfile />} />
         <Route path="/areas" element={<Areas />} />
         <Route path="/managers" element={<Managers />} />
         <Route path="/collectors" element={<Collectors />} />

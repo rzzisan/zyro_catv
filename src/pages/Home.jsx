@@ -1,14 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const apiBase = import.meta.env.PROD
   ? '/api'
   : import.meta.env.VITE_API_BASE || 'http://localhost:5000'
 
+const isTokenValid = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return false
+  const parts = token.split('.')
+  if (parts.length !== 3) return false
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    if (payload?.exp && Date.now() / 1000 >= payload.exp) {
+      return false
+    }
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 function Home() {
   const navigate = useNavigate()
   const [showRegister, setShowRegister] = useState(false)
-  const [loginForm, setLoginForm] = useState({ mobile: '', password: '' })
+  const [loginForm, setLoginForm] = useState({
+    mobile: '',
+    password: '',
+    rememberMe: false,
+  })
   const [registerForm, setRegisterForm] = useState({
     name: '',
     companyName: '',
@@ -20,9 +40,18 @@ function Home() {
   const [status, setStatus] = useState({ type: '', message: '' })
   const [isLoading, setIsLoading] = useState(false)
 
+  useEffect(() => {
+    if (isTokenValid()) {
+      navigate('/dashboard')
+    }
+  }, [navigate])
+
   const handleLoginChange = (event) => {
-    const { name, value } = event.target
-    setLoginForm((prev) => ({ ...prev, [name]: value }))
+    const { name, type, checked, value } = event.target
+    setLoginForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
   }
 
   const handleRegisterChange = (event) => {
@@ -129,6 +158,17 @@ function Home() {
               onChange={handleLoginChange}
               autoComplete="current-password"
             />
+          </label>
+          <label className="field remember-field">
+            <span>
+              <input
+                name="rememberMe"
+                type="checkbox"
+                checked={loginForm.rememberMe}
+                onChange={handleLoginChange}
+              />
+              ৩ মাসের জন্য লগইন মনে রাখুন
+            </span>
           </label>
           <button className="btn primary" type="submit" disabled={isLoading}>
             {isLoading ? 'লোড হচ্ছে...' : 'লগইন করুন'}

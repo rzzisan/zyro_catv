@@ -26,4 +26,10 @@ server/.env
 *.sln
 *.sw?
 /apk
-/screenshoots
+/screenshoot
+/android/.gradle/
+/android/app/build/
+/android/gradle/
+/android/gradlew
+/android/gradlew.bat
+/android/local.properties

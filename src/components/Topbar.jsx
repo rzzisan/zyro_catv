@@ -7,10 +7,21 @@ function Topbar({ title, subtitle, onToggleSidebar }) {
   const [userRole, setUserRole] = useState('')
 
   useEffect(() => {
-    const name = localStorage.getItem('user_name') || ''
-    const role = localStorage.getItem('user_role') || ''
-    setUserName(name)
-    setUserRole(role)
+    const syncUser = () => {
+      const name = localStorage.getItem('user_name') || ''
+      const role = localStorage.getItem('user_role') || ''
+      setUserName(name)
+      setUserRole(role)
+    }
+
+    syncUser()
+    window.addEventListener('storage', syncUser)
+    window.addEventListener('user-profile-updated', syncUser)
+
+    return () => {
+      window.removeEventListener('storage', syncUser)
+      window.removeEventListener('user-profile-updated', syncUser)
+    }
   }, [])
 
   const getRoleDisplay = (role) => {
@@ -48,10 +59,15 @@ function Topbar({ title, subtitle, onToggleSidebar }) {
       </div>
       <div className="topbar-user">
         <div className="avatar" aria-hidden="true" />
-        <div>
+        <button
+          className="user-profile-btn"
+          type="button"
+          onClick={() => navigate('/profile')}
+          aria-label="Open user profile"
+        >
           <div className="user-name">{userName || 'User'}</div>
           <div className="user-role">{getRoleDisplay(userRole)}</div>
-        </div>
+        </button>
         <button className="logout-btn" type="button" onClick={handleLogout}>
           লগআউট
         </button>
