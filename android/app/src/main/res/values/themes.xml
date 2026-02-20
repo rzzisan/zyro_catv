@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ZyroTechCATV" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.ZyroTechCATV" parent="android:Theme.Material">
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>
 </resources>
