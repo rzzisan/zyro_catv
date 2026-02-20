@@ -48,7 +48,9 @@ function Home() {
       }
 
       localStorage.setItem('auth_token', data.token)
-      setStatus({ type: 'success', message: 'লগইন সফল হয়েছে।' })
+      localStorage.setItem('user_name', data.user.name)
+      localStorage.setItem('user_role', data.user.role)
+      setStatus({ type: 'success', message: 'লগইন সফল হয়েছে।' })
       navigate('/dashboard')
     } catch (error) {
       setStatus({ type: 'error', message: error.message })
@@ -81,7 +83,9 @@ function Home() {
       }
 
       localStorage.setItem('auth_token', data.token)
-      setStatus({ type: 'success', message: 'রেজিস্ট্রেশন সফল হয়েছে।' })
+      localStorage.setItem('user_name', data.user.name)
+      localStorage.setItem('user_role', data.user.role)
+      setStatus({ type: 'success', message: 'রেজিস্ট্রেশন সফল হয়েছে।' })
       navigate('/dashboard')
     } catch (error) {
       setStatus({ type: 'error', message: error.message })
