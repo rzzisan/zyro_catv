@@ -1401,11 +1401,11 @@ a {
 
 .collector-billing-container {
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+  margin: -0.95rem -1.35rem 0;
+  padding: 0.4rem 0.35rem;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 0.35rem;
 }
 
 /* Area Selector */
@@ -1413,28 +1413,28 @@ a {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  padding: 0.8rem;
+  padding: 0.5rem 0.6rem;
   background: var(--surface);
   border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--bg-strong);
 }
 
 .area-label {
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .area-select {
   flex: 1;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--bg-strong);
-  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #d9cfc2;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1451,43 +1451,71 @@ a {
 
 /* Status Tabs */
 .status-tabs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0.6rem;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--bg-strong);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.collector-search {
+  background: var(--surface);
+  border: 1px solid var(--bg-strong);
+  border-radius: 12px;
+  padding: 0.5rem 0.6rem;
+}
+
+.collector-search input {
+  width: 100%;
+  border: 1px solid #d9cfc2;
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  background: #fff;
+  font-size: 0.85rem;
+  font-family: inherit;
 }
 
 .status-tabs .tab {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.7rem 0.6rem;
-  background: var(--surface);
-  border: 1px solid var(--bg-strong);
-  border-radius: 10px;
+  gap: 0.1rem;
+  padding: 0.55rem 0.3rem;
+  background: transparent;
+  border: none;
   cursor: pointer;
   font-family: inherit;
   font-weight: 600;
-  font-size: 0.8rem;
-  color: var(--muted);
+  font-size: 0.82rem;
+  color: #6f6a64;
   transition: all 0.2s ease;
+  position: relative;
+}
+
+.status-tabs .tab + .tab {
+  border-left: 1px solid #efe4d7;
 }
 
 .status-tabs .tab:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  color: #a25241;
 }
 
 .status-tabs .tab.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
-  box-shadow: 0 2px 8px rgba(15, 124, 123, 0.2);
+  color: #a25241;
 }
 
-.tab-icon {
-  font-size: 1.1rem;
+.status-tabs .tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  border-radius: 999px;
+  background: #a25241;
 }
 
 .tab-label {
@@ -1499,6 +1527,7 @@ a {
   font-size: 0.65rem;
   opacity: 0.8;
   font-weight: 500;
+  min-height: 0.7rem;
 }
 
 /* Content Area */
@@ -1537,13 +1566,14 @@ a {
 
 /* Customer Row */
 .collector-customer-row {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
   justify-content: space-between;
-  padding: 0.9rem 1rem;
+  padding: 0.52rem 0.6rem;
   border-bottom: 1px solid var(--bg-strong);
   transition: background-color 0.2s ease;
-  gap: 1rem;
+  gap: 0.7rem;
 }
 
 .collector-customer-row:last-child {
@@ -1554,18 +1584,25 @@ a {
   background-color: var(--bg);
 }
 
+.customer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f5b55e;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
 .customer-main-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.25rem;
   min-width: 0;
-}
-
-.customer-name-id {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
 }
 
 .customer-name {
@@ -1576,26 +1613,20 @@ a {
 }
 
 .customer-id {
-  font-size: 0.8rem;
-  color: var(--muted);
+  font-size: 0.78rem;
+  color: #6f6a64;
 }
 
 .customer-contact-info {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.76rem;
+  color: #6f6a64;
 }
 
-.contact-label {
-  font-size: 0.85rem;
-}
-
-.contact-value {
-  color: var(--muted);
-  max-width: 150px;
+.contact-line {
+  line-height: 1.2;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1604,19 +1635,20 @@ a {
 .customer-right-section {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.7rem;
   flex-shrink: 0;
-  padding-left: 1rem;
-  border-left: 1px solid var(--bg-strong);
+  padding-left: 0.5rem;
+  border-left: none;
 }
 
 .due-amount {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--accent);
+  color: #1f7a6a;
   text-align: right;
   min-width: 80px;
 }
+
 
 .menu-button {
   width: 32px;
@@ -1631,112 +1663,100 @@ a {
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  color: #a25241;
 }
 
 .menu-button:hover {
   background: var(--bg);
-  color: var(--primary);
+  color: #7f3e33;
 }
 
-/* Menu Dialog */
-.menu-dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
+/* Menu Popover */
+.menu-anchor {
+  position: relative;
+}
+
+.menu-popover {
+  position: absolute;
   right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.menu-dialog {
-  background: var(--surface);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  padding: 0.4rem;
+  top: 38px;
+  background: #a25241;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  padding: 0.4rem 0;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  min-width: 160px;
-  max-width: 250px;
+  gap: 0.1rem;
+  min-width: 140px;
+  z-index: 20;
 }
 
 .menu-item {
-  padding: 0.7rem 0.8rem;
+  padding: 0.6rem 0.9rem;
   background: transparent;
   border: none;
   text-align: left;
   font-family: inherit;
   font-size: 0.85rem;
-  color: var(--ink);
+  color: #fff;
   cursor: pointer;
   transition: all 0.15s ease;
-  border-radius: 6px;
+  border-radius: 0;
   white-space: nowrap;
 }
 
 .menu-item:hover {
-  background: var(--bg);
-  color: var(--primary);
-}
-
-.menu-item:active {
-  background: var(--bg-strong);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .collector-billing-container {
-    padding: 1rem 0.8rem;
+    margin: -0.75rem -1rem 0;
+    padding: 0.35rem 0.32rem;
   }
 
   .status-tabs {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.4rem;
+    flex-wrap: nowrap;
   }
 
   .tab {
-    padding: 0.6rem 0.4rem;
-    font-size: 0.75rem;
-  }
-
-  .tab-icon {
-    font-size: 1rem;
+    padding: 0.7rem 0.4rem;
+    font-size: 0.78rem;
   }
 
   .collector-customer-row {
-    padding: 0.8rem;
+    padding: 0.5rem 0.55rem;
     gap: 0.6rem;
-    flex-wrap: wrap;
   }
 
   .customer-right-section {
-    border-left: none;
     padding-left: 0;
-    width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
   .due-amount {
     min-width: auto;
   }
 
-  .customer-contact-info {
-    font-size: 0.75rem;
+  .contact-line {
+    max-width: 180px;
   }
 
-  .contact-value {
-    max-width: 120px;
+  .collector-search {
+    padding: 0.45rem 0.5rem;
+  }
+
+  .collector-search input {
+    padding: 0.5rem 0.7rem;
   }
 }
 
 @media (max-width: 480px) {
   .collector-billing-container {
-    padding: 0.8rem;
-    gap: 1rem;
+    margin: -0.65rem -0.85rem 0;
+    padding: 0.3rem 0.3rem;
+    gap: 0.6rem;
   }
 
   .area-selector-section {
@@ -1755,8 +1775,7 @@ a {
   }
 
   .status-tabs {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4rem;
+    flex-direction: row;
   }
 
   .tab {
@@ -1774,16 +1793,12 @@ a {
   }
 
   .collector-customer-row {
-    padding: 0.7rem;
-    flex-direction: column;
+    padding: 0.45rem 0.5rem;
+    grid-template-columns: 40px 1fr auto;
   }
 
   .customer-right-section {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--bg-strong);
     padding-left: 0;
-    padding-top: 0.7rem;
   }
 
   .due-amount {
@@ -1796,7 +1811,8 @@ a {
     font-size: 0.9rem;
   }
 
-  .contact-value {
-    max-width: 100px;
+  .contact-line {
+    max-width: 140px;
   }
+
 }

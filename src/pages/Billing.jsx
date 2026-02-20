@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -116,6 +117,10 @@ function Billing() {
 
   const token = localStorage.getItem('auth_token')
   const role = getUserRole()
+
+  if (role === 'COLLECTOR') {
+    return <Navigate to="/collector-billing" replace />
+  }
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams()
