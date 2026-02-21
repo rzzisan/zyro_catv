@@ -64,7 +64,18 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
       include: {
         collectedBy: { select: { id: true, name: true } },
         ...(includeDetails
-          ? { bill: { select: { id: true, customer: { select: { name: true, customerCode: true, mobile: true } } } } }
+          ? {
+              bill: {
+                select: {
+                  id: true,
+                  periodMonth: true,
+                  periodYear: true,
+                  amount: true,
+                  status: true,
+                  customer: { select: { name: true, customerCode: true, mobile: true } },
+                },
+              },
+            }
           : {}),
       },
       orderBy: { paidAt: 'desc' },
