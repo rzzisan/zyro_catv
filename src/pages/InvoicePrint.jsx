@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { usePageTitle } from '../hooks/usePageTitle.js'
 
 const apiBase = import.meta.env.PROD
   ? '/api'
@@ -19,6 +20,7 @@ const formatMonths = (items = []) => {
 }
 
 function InvoicePrint() {
+  usePageTitle('ইনভয়েস প্রিন্ট') // Set page title for Invoice Print page
   const { billId } = useParams()
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('')

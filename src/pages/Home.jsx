@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageTitle } from '../hooks/usePageTitle.js'
 
 const apiBase = import.meta.env.PROD
   ? '/api'
@@ -22,6 +23,7 @@ const isTokenValid = () => {
 }
 
 function Home() {
+  usePageTitle('লগইন') // Set page title for Home/Login page
   const navigate = useNavigate()
   const [showRegister, setShowRegister] = useState(false)
   const [loginForm, setLoginForm] = useState({

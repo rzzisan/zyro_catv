@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 import Topbar from './Topbar.jsx'
+import { usePageTitle } from '../hooks/usePageTitle.js'
 
 function AppLayout({ title, subtitle, children }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // Update page title dynamically
+  usePageTitle(title)
 
   useEffect(() => {
     try {
