@@ -1,6 +1,23 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 
+const adminModules = [
+  { label: 'ড্যাশবোর্ড', to: '/admin/dashboard', icon: 'dashboard' },
+  { label: 'কোম্পানি', to: '/admin/companies', icon: 'building' },
+  { label: '__SEPARATOR__' },
+  { label: 'সব ইউজার', to: '/admin/users', icon: 'users' },
+  { label: 'প্যাকেজ', to: '/admin/packages', icon: 'package' },
+  { label: '__SEPARATOR__' },
+  { label: 'কার্যক্রম লগ', to: '/admin/activity-logs', icon: 'log' },
+  { label: 'পরিবর্তন ট্রেইল', to: '/admin/audit-trail', icon: 'history' },
+  { label: '__SEPARATOR__' },
+  { label: 'সাপোর্ট টিকেট', to: '/admin/support-tickets', icon: 'ticket' },
+  { label: 'ব্যাকআপ', to: '/admin/backups', icon: 'database' },
+  { label: '__SEPARATOR__' },
+  { label: 'বিশ্লেষণ', to: '/admin/analytics', icon: 'chart' },
+  { label: 'সিস্টেম সেটিংস', to: '/admin/settings', icon: 'settings' },
+]
+
 const modules = [
   { label: 'ড্যাশবোর্ড', to: '/dashboard', icon: 'dashboard' },
   { label: 'এরিয়া', to: '/areas', icon: 'area' },
@@ -191,6 +208,51 @@ const Icon = ({ name }) => {
           <path d="M8 16h5" />
         </svg>
       )
+    case 'building':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <rect x="4" y="3" width="16" height="18" rx="1" />
+          <path d="M8 8h3v3H8z" />
+          <path d="M13 8h3v3h-3z" />
+          <path d="M8 13h3v3H8z" />
+          <path d="M13 13h3v3h-3z" />
+        </svg>
+      )
+    case 'package':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <path d="M12 2L3 7v10c0 5 9 5 9 5s9 0 9-5V7l-9-5z" />
+          <path d="M3 7l9 5 9-5" />
+          <path d="M12 12v10" />
+        </svg>
+      )
+    case 'ticket':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 9h6" />
+          <path d="M9 13h6" />
+          <circle cx="5" cy="11" r="1" />
+          <circle cx="19" cy="11" r="1" />
+        </svg>
+      )
+    case 'database':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v6c0 2 4 3 8 3s8-1 8-3V5" />
+          <path d="M4 11v6c0 2 4 3 8 3s8-1 8-3v-6" />
+        </svg>
+      )
+    case 'chart':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <path d="M4 19v-5" />
+          <path d="M10 19v-9" />
+          <path d="M16 19v-3" />
+          <line x1="3" y1="19" x2="21" y2="19" />
+        </svg>
+      )
     case 'report':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
@@ -233,7 +295,12 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
   ])
   const [isReportOpen, setIsReportOpen] = useState(false)
   const isReportActive = location.pathname.startsWith('/reports')
-  const visibleModules = modules.filter((item) => {
+  const isAdminActive = location.pathname.startsWith('/admin')
+  
+  // Super Admin দেখাবে admin modules, অন্যরা দেখাবে নরমাল modules
+  const modulesToUse = role === 'SUPER_ADMIN' ? adminModules : modules
+  
+  const visibleModules = modulesToUse.filter((item) => {
     if (role === 'COLLECTOR' && collectorHidden.has(item.to)) {
       return false
     }
@@ -242,7 +309,7 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
     }
     return true
   })
-  const visibleReports = reportModules
+  const visibleReports = role === 'SUPER_ADMIN' ? [] : reportModules
 
   useEffect(() => {
     if (isReportActive) {
@@ -293,6 +360,16 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
       </div>
       <nav className="sidebar-nav">
         {visibleModules.map((item) => {
+          // Super Admin এর জন্য report group লুকিয়ে দিন
+          if (item.label === '__REPORT_GROUP__' && role === 'SUPER_ADMIN') {
+            return null
+          }
+          
+          // Separator এর জন্য শুধু একটি visual divider
+          if (item.label === '__SEPARATOR__') {
+            return <div key={item.label} className="sidebar-separator" style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '8px 0' }} />
+          }
+
           if (item.label === '__REPORT_GROUP__') {
             return (
               <div

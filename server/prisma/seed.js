@@ -15,7 +15,30 @@ async function seed() {
   const adminPassword = await bcrypt.hash('admin123', 10)
   const managerPassword = await bcrypt.hash('manager123', 10)
   const collectorPassword = await bcrypt.hash('collector123', 10)
+  const superAdminPassword = await bcrypt.hash('superadmin123', 10)
 
+  // === SUPER ADMIN SETUP (Global, no company) ===
+  const superAdmin = await prisma.user.upsert({
+    where: { mobile: '01600000000' },
+    update: {
+      name: 'সুপার এডমিন',
+      role: 'SUPER_ADMIN',
+      passwordHash: superAdminPassword,
+      email: 'superadmin@zyrotech.com',
+    },
+    create: {
+      role: 'SUPER_ADMIN',
+      name: 'সুপার এডমিন',
+      mobile: '01600000000',
+      email: 'superadmin@zyrotech.com',
+      passwordHash: superAdminPassword,
+      // companyId is null for SUPER_ADMIN
+    },
+  })
+
+  console.log('✅ Super Admin created: 01600000000 / superadmin123')
+
+  // ===== EXISTING COMPANY SETUP =====
   const starterPackage = await prisma.package.findFirst({
     where: { name: 'Starter' },
   })
@@ -50,7 +73,7 @@ async function seed() {
 
   const adminUser = await prisma.user.upsert({
     where: {
-      companyId_mobile: {
+      company_mobile: {
         companyId: company.id,
         mobile: '01700000000',
       },
@@ -72,7 +95,7 @@ async function seed() {
 
   const managerUser = await prisma.user.upsert({
     where: {
-      companyId_mobile: {
+      company_mobile: {
         companyId: company.id,
         mobile: '01800000000',
       },
@@ -93,7 +116,7 @@ async function seed() {
 
   const collectorUser = await prisma.user.upsert({
     where: {
-      companyId_mobile: {
+      company_mobile: {
         companyId: company.id,
         mobile: '01900000000',
       },

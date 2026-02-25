@@ -22,6 +22,16 @@ import ReportsPaymentMessage from './pages/ReportsPaymentMessage.jsx'
 import ReportsPreviousSummary from './pages/ReportsPreviousSummary.jsx'
 import Tutorials from './pages/Tutorials.jsx'
 import UserProfile from './pages/UserProfile.jsx'
+import AdminDashboard from './pages/AdminDashboard.jsx'
+import AdminCompanies from './pages/AdminCompanies.jsx'
+import AdminUsers from './pages/AdminUsers.jsx'
+import AdminActivityLogs from './pages/AdminActivityLogs.jsx'
+import AdminAuditTrail from './pages/AdminAuditTrail.jsx'
+import AdminPackages from './pages/AdminPackages.jsx'
+import AdminSettings from './pages/AdminSettings.jsx'
+import AdminSupportTickets from './pages/AdminSupportTickets.jsx'
+import AdminBackups from './pages/AdminBackups.jsx'
+import AdminAnalytics from './pages/AdminAnalytics.jsx'
 
 function App() {
   return (
@@ -52,6 +62,20 @@ function App() {
         <Route path="/expense-categories" element={<ExpenseCategories />} />
         <Route path="/employees" element={<Employees />} />
         <Route path="/tutorials" element={<Tutorials />} />
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/companies" element={<AdminCompanies />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
+        <Route path="/admin/audit-trail" element={<AdminAuditTrail />} />
+        <Route path="/admin/packages" element={<AdminPackages />} />
+        <Route path="/admin/settings" element={<AdminSettings />} />
+        <Route path="/admin/support-tickets" element={<AdminSupportTickets />} />
+        <Route path="/admin/backups" element={<AdminBackups />} />
+        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

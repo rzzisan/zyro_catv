@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   MANAGER
   COLLECTOR
@@ -38,55 +39,73 @@ enum BillingSystem {
 }
 
 model Package {
-  id             String    @id @default(cuid())
-  name           String
-  price          Int
-  durationMonths Int?
-  features       Json?
-  createdAt      DateTime  @default(now())
-  companies      Company[]
+  id                  String   @id @default(cuid())
+  name                String
+  price               Int
+  durationMonths      Int?
+  features            Json?
+  maxCustomers        Int?     // Null = unlimited
+  maxStorage          Int?     // In MB
+  apiRateLimit        Int      @default(10000) // per day
+  supportTier         String   @default("standard") // basic, standard, premium
+  createdAt           DateTime @default(now())
+  companies           Company[]
+  subscriptions       CompanySubscription[]
 }
 
 model Company {
-  id            String         @id @default(cuid())
-  name          String
+  id            String               @id @default(cuid())
+  name          String               @unique
   helplineNumber String?
-  invoiceNote   String?        @db.Text
+  invoiceNote   String?              @db.Text
   slogan        String?
-  address       String?        @db.Text
-  billingSystem BillingSystem  @default(POSTPAID)
+  address       String?              @db.Text
+  billingSystem BillingSystem        @default(POSTPAID)
   packageId     String?
-  createdAt     DateTime       @default(now())
-  package       Package?       @relation(fields: [packageId], references: [id])
+  status        String               @default("ACTIVE") // ACTIVE, SUSPENDED, TRIAL, EXPIRED
+  isVerified    Boolean              @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime?
+  package       Package?             @relation(fields: [packageId], references: [id])
   users         User[]
   areas         Area[]
   customerTypes CustomerType[]
   customers     Customer[]
   bills         Bill[]
   deposits      Deposit[]
+  subscription  CompanySubscription?
 }
 
 model User {
   id                 String              @id @default(cuid())
-  companyId          String
+  companyId          String?             // Null for SUPER_ADMIN
   role               UserRole
   name               String
-  mobile             String
-  email              String?
+  mobile             String              @unique
+  email              String?             @unique
   passwordHash       String
   isActive           Boolean             @default(true)
+  lastLogin          DateTime?
+  loginAttempts      Int                 @default(0)
+  lockedUntil        DateTime?
+  twoFAEnabled       Boolean             @default(false)
+  twoFASecret        String?
   createdAt          DateTime            @default(now())
-  company            Company             @relation(fields: [companyId], references: [id])
+  updatedAt          DateTime?
+  company            Company?            @relation(fields: [companyId], references: [id])
   managerPermissions ManagerPermission[]
   collectedPayments  Payment[]
   createdAreas       Area[]
   createdCustomerTypes CustomerType[]
   createdCustomers   Customer[]
   collectorAreas     CollectorArea[]
-  deposits           Deposit[]        @relation("CollectorDeposits")
-  approvedDeposits   Deposit[]        @relation("ApproverDeposits")
+  deposits           Deposit[]           @relation("CollectorDeposits")
+  approvedDeposits   Deposit[]           @relation("ApproverDeposits")
+  activityLogs       ActivityLog[]
+  apiKeys            APIKey[]
 
-  @@unique([companyId, mobile])
+  @@unique([companyId, mobile], name: "company_mobile")
 }
 
 model Permission {
@@ -229,4 +248,203 @@ model Deposit {
 
   @@index([companyId, status])
   @@index([collectorId])
+}
+
+// ========== SUPER ADMIN RELATED MODELS ==========
+
+enum ActivityType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  DOWNLOAD
+  EXPORT
+  IMPORT
+  APPROVE
+  REJECT
+}
+
+model ActivityLog {
+  id           String       @id @default(cuid())
+  userId       String
+  action       ActivityType
+  entityType   String       // e.g., "Customer", "Bill", "User"
+  entityId     String?
+  oldData      Json?
+  newData      Json?
+  ipAddress    String?
+  userAgent    String?
+  status       String       // SUCCESS, FAILED, PENDING
+  errorMessage String?
+  companyId    String?
+  createdAt    DateTime     @default(now())
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AuditTrail {
+  id           String   @id @default(cuid())
+  tableName    String
+  recordId     String
+  action       String   // CREATE, UPDATE, DELETE
+  oldValues    Json?
+  newValues    Json?
+  changedBy    String   // User ID
+  changedAt    DateTime @default(now())
+  reason       String?
+  ipAddress    String?
+  companyId    String?
+
+  @@index([tableName, recordId])
+  @@index([changedBy, changedAt])
+  @@index([companyId, changedAt])
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+model SupportTicket {
+  id          String         @id @default(cuid())
+  ticketNumber String         @unique
+  companyId   String
+  createdById String
+  title       String
+  description String         @db.Text
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  category    String         // e.g., "Technical", "Billing", "General"
+  assignedTo  String?        // Super Admin User ID
+  resolution  String?        @db.Text
+  attachments String?        // JSON array of file URLs
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  resolvedAt  DateTime?
+
+  @@index([companyId, status])
+  @@index([assignedTo])
+  @@index([createdAt])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  subject   String
+  body      String   @db.Text
+  variables Json?    // Array of variable names
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SMSTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  body      String   @db.Text
+  variables Json?    // Array of variable names
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSettings {
+  id              String   @id @default(cuid())
+  settingKey      String   @unique
+  settingValue    String   @db.Text
+  description     String?
+  category        String   // "general", "security", "email", "sms", "api"
+  isEnvironment   Boolean  @default(false) // If true, use env var
+  updatedBy       String?  // User ID
+  updatedAt       DateTime @default(now())
+}
+
+model CompanySubscription {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  packageId       String
+  startDate       DateTime
+  endDate         DateTime
+  status          String   // ACTIVE, EXPIRED, CANCELLED, SUSPENDED
+  autoRenew       Boolean  @default(true)
+  totalAmount     Int      // Full subscription price
+  paidAmount      Int      @default(0)
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company  @relation(fields: [companyId], references: [id])
+  package         Package  @relation(fields: [packageId], references: [id])
+
+  @@index([status, endDate])
+}
+
+model BackupLog {
+  id            String   @id @default(cuid())
+  backupName    String   @unique
+  backupSize    Int      // Size in bytes
+  backupPath    String
+  backupType    String   // FULL, INCREMENTAL
+  status        String   // SUCCESS, FAILED, PENDING
+  errorMessage  String?
+  startedAt     DateTime
+  completedAt   DateTime?
+  restoredAt    DateTime?
+  createdBy     String?  // User ID
+  createdAt     DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  logLevel    String   // INFO, WARNING, ERROR, CRITICAL
+  module      String   // e.g., "Database", "API", "Auth"
+  message     String   @db.Text
+  details     Json?
+  errorStack  String?  @db.Text
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([logLevel, createdAt])
+  @@index([module, createdAt])
+}
+
+model IPWhitelist {
+  id        String   @id @default(cuid())
+  ipAddress String   @unique
+  description String?
+  addedBy   String?  // User ID
+  addedAt   DateTime @default(now())
+  lastUsed  DateTime?
+  isActive  Boolean  @default(true)
+}
+
+model APIKey {
+  id          String   @id @default(cuid())
+  userId      String
+  keyName     String
+  keyHash     String   @unique
+  permissions Json?
+  rateLimit   Int      @default(1000) // requests per hour
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, isActive])
 }

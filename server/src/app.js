@@ -10,6 +10,7 @@ import companyRoutes from './routes/company.js'
 import invoiceRoutes from './routes/invoices.js'
 import reportRoutes from './routes/reports.js'
 import userRoutes from './routes/users.js'
+import adminRoutes from './routes/admin.js'
 
 const app = express()
 
@@ -30,6 +31,7 @@ app.use('/api/company', companyRoutes)
 app.use('/api/invoices', invoiceRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.use((err, req, res, next) => {
   console.error(err)
