@@ -504,49 +504,57 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
     }
 
     if (remaining > 0) {
-      const latestBill = billsForPayment[billsForPayment.length - 1]
-      let safety = 0
-      let cursorDate = latestBill
-        ? addMonths(monthStart(new Date(latestBill.periodYear, latestBill.periodMonth - 1, 1)), 1)
-        : monthStart(now)
+      if (billingSystem === 'POSTPAID') {
+        const currentAllocationIndex = allocations.findIndex((item) => item.billId === bill.id)
+        if (currentAllocationIndex >= 0) {
+          allocations[currentAllocationIndex].amount += remaining
+        } else {
+          allocations.push({ billId: bill.id, amount: remaining })
+        }
+        remaining = 0
+      } else {
+        const latestBill = billsForPayment[billsForPayment.length - 1]
+        let safety = 0
+        let cursorDate = latestBill
+          ? addMonths(monthStart(new Date(latestBill.periodYear, latestBill.periodMonth - 1, 1)), 1)
+          : monthStart(now)
 
-// সর্বোচ্চ ৬ মাস পর্যন্ত সামনের দিকে বিল তৈরি করুন
-    while (remaining > 0 && safety < 6) {
-      const year = cursorDate.getFullYear()
-      const month = cursorDate.getMonth() + 1
-      const newBill = await prisma.bill.upsert({
-        where: {
-          customerId_periodMonth_periodYear: {
-            customerId: bill.customer.id,
-            periodMonth: month,
-            periodYear: year,
-          },
-        },
-        update: {},
-        create: {
-          companyId: req.user.companyId,
-          customerId: bill.customer.id,
-          periodMonth: month,
-          periodYear: year,
-          amount: monthlyFee,
-          status: 'DUE',
-        },
-      })
-      const applied = Math.min(monthlyFee, remaining)
-      allocations.push({ billId: newBill.id, amount: applied })
-      remaining -= applied
-      cursorDate = addMonths(cursorDate, 1)
-      safety += 1
-    }
-    
-    // যদি সীমার পরেও টাকা অবশিষ্ট থাকে, তাহলে ADVANCE amount এ রাখুন
-    if (remaining > 0) {
-      // শেষ bill এ অতিরিক্ত টাকা allocation করুন
-      if (allocations.length > 0) {
-        allocations[allocations.length - 1].amount += remaining
+        // সর্বোচ্চ ৬ মাস পর্যন্ত সামনের দিকে বিল তৈরি করুন
+        while (remaining > 0 && safety < 6) {
+          const year = cursorDate.getFullYear()
+          const month = cursorDate.getMonth() + 1
+          const newBill = await prisma.bill.upsert({
+            where: {
+              customerId_periodMonth_periodYear: {
+                customerId: bill.customer.id,
+                periodMonth: month,
+                periodYear: year,
+              },
+            },
+            update: {},
+            create: {
+              companyId: req.user.companyId,
+              customerId: bill.customer.id,
+              periodMonth: month,
+              periodYear: year,
+              amount: monthlyFee,
+              status: 'DUE',
+            },
+          })
+          const applied = Math.min(monthlyFee, remaining)
+          allocations.push({ billId: newBill.id, amount: applied })
+          remaining -= applied
+          cursorDate = addMonths(cursorDate, 1)
+          safety += 1
+        }
+
+        // যদি সীমার পরেও টাকা অবশিষ্ট থাকে, তাহলে ADVANCE amount এ রাখুন
+        if (remaining > 0 && allocations.length > 0) {
+          allocations[allocations.length - 1].amount += remaining
+          remaining = 0
+        }
       }
     }
-  }
 
   if (!allocations.length) {
     return res.status(400).json({ error: 'কোনো পেমেন্টযোগ্য বিল পাওয়া যায়নি' })
