@@ -222,6 +222,31 @@ router.post('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res
       },
     })
 
+    // যদি opening/arrear due (dueBalance) থাকে, তাহলে এই মাসে একটি bill তৈরি করি
+    if ((payload.dueBalance ?? 0) > 0) {
+      const now = new Date()
+      const month = now.getMonth() + 1
+      const year = now.getFullYear()
+      
+      try {
+        await prisma.bill.create({
+          data: {
+            companyId: req.user.companyId,
+            customerId: customer.id,
+            periodMonth: month,
+            periodYear: year,
+            amount: payload.dueBalance,
+            status: 'DUE',
+          },
+        })
+      } catch (billError) {
+        // যদি এই মাসে বিল ইতিমধ্যে exist করে, তাহলে skip করি (duplicate key error)
+        if (billError.code !== 'P2002') {
+          console.error('Opening bill creation error:', billError)
+        }
+      }
+    }
+
     res.status(201).json({ data: customer })
   } catch (error) {
     if (error.code === 'P2002') {
@@ -297,6 +322,11 @@ router.post(
       let failed = 0
       const errors = []
 
+      // Current month/year for opening bills
+      const now = new Date()
+      const currentMonth = now.getMonth() + 1
+      const currentYear = now.getFullYear()
+
       for (let index = 0; index < rawRows.length; index += 1) {
         const row = rawRows[index]
         const rowNumber = index + 2
@@ -354,7 +384,7 @@ router.post(
         const dueBalance = parseNumber(mapped.dueBalance) ?? 0
 
         try {
-          await prisma.customer.create({
+          const newCustomer = await prisma.customer.create({
             data: {
               companyId: req.user.companyId,
               areaId,
@@ -373,6 +403,27 @@ router.post(
           created += 1
           existingCodes.add(codeKey)
           if (mobile) existingMobiles.add(mobile)
+
+          // যদি opening/arrear due (dueBalance) থাকে, তাহলে চলতি মাসে একটি bill তৈরি করি
+          if (dueBalance > 0) {
+            try {
+              await prisma.bill.create({
+                data: {
+                  companyId: req.user.companyId,
+                  customerId: newCustomer.id,
+                  periodMonth: currentMonth,
+                  periodYear: currentYear,
+                  amount: dueBalance,
+                  status: 'DUE',
+                },
+              })
+            } catch (billError) {
+              // Duplicate bill ignore করি
+              if (billError.code !== 'P2002') {
+                console.error('Opening bill creation error (import):', billError)
+              }
+            }
+          }
         } catch (error) {
           if (error.code === 'P2002') {
             skipped += 1
