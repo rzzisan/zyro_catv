@@ -321,6 +321,7 @@ router.post(
       let skipped = 0
       let failed = 0
       const errors = []
+      const skippedRecords = []
 
       // Current month/year for opening bills
       const now = new Date()
@@ -377,6 +378,18 @@ router.post(
         const codeKey = customerCode.toLowerCase()
         if (existingCodes.has(codeKey) || (mobile && existingMobiles.has(mobile))) {
           skipped += 1
+          const reason = existingCodes.has(codeKey)
+            ? 'Duplicate customer code'
+            : 'Duplicate mobile number'
+          skippedRecords.push({
+            row: rowNumber,
+            customerCode,
+            name,
+            mobile: mobile || '',
+            area: mapped.area,
+            customerType: mapped.customerType,
+            reason,
+          })
           continue
         }
 
@@ -427,6 +440,15 @@ router.post(
         } catch (error) {
           if (error.code === 'P2002') {
             skipped += 1
+            skippedRecords.push({
+              row: rowNumber,
+              customerCode,
+              name,
+              mobile: mobile || '',
+              area: mapped.area,
+              customerType: mapped.customerType,
+              reason: 'Database duplicate constraint',
+            })
           } else {
             failed += 1
             errors.push({ row: rowNumber, reason: 'Database error' })
@@ -442,6 +464,7 @@ router.post(
           failed,
         },
         errors: errors.slice(0, 10),
+        skippedRecords: skippedRecords.slice(0, 50),
       })
     } catch (error) {
       return next(error)

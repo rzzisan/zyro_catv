@@ -52,6 +52,7 @@ function Customers() {
   const [importStatus, setImportStatus] = useState('')
   const [importSummary, setImportSummary] = useState(null)
   const [importErrors, setImportErrors] = useState([])
+  const [importSkipped, setImportSkipped] = useState([])
   const [isImporting, setIsImporting] = useState(false)
   const [form, setForm] = useState({
     areaId: '',
@@ -166,6 +167,7 @@ function Customers() {
     setImportStatus('')
     setImportSummary(null)
     setImportErrors([])
+    setImportSkipped([])
   }
 
   const formatDateValue = (value) => {
@@ -367,6 +369,7 @@ function Customers() {
     setImportStatus('')
     setImportSummary(null)
     setImportErrors([])
+    setImportSkipped([])
     try {
       const formData = new FormData()
       formData.append('file', importFile)
@@ -382,6 +385,7 @@ function Customers() {
       }
       setImportSummary(data.summary || null)
       setImportErrors(data.errors || [])
+      setImportSkipped(data.skippedRecords || [])
       setImportStatus('ইমপোর্ট সম্পন্ন')
       await loadCustomers()
     } catch (error) {
@@ -822,7 +826,32 @@ function Customers() {
             ) : null}
             {importErrors.length ? (
               <div className="status-banner error">
-                {importErrors.map((item) => `Row ${item.row}: ${item.reason}`).join(' | ')}
+                <strong>ত্রুটি:</strong> {importErrors.map((item) => `Row ${item.row}: ${item.reason}`).join(' | ')}
+              </div>
+            ) : null}
+            {importSkipped.length ? (
+              <div className="import-skipped-section">
+                <h4 className="skipped-title">স্কিপ করা গ্রাহক ({importSkipped.length})</h4>
+                <div className="skipped-list">
+                  {importSkipped.map((item, idx) => (
+                    <div key={idx} className="skipped-item">
+                      <div className="skipped-header">
+                        <span className="skipped-row">Row {item.row}</span>
+                        <span className="skipped-code">{item.customerCode}</span>
+                      </div>
+                      <div className="skipped-details">
+                        <span className="skipped-name">{item.name}</span>
+                        <span className="skipped-mobile">{item.mobile}</span>
+                      </div>
+                      <div className="skipped-meta">
+                        <span>{item.area} • {item.customerType}</span>
+                      </div>
+                      <div className="skipped-reason">
+                        <strong>কারণ:</strong> {item.reason === 'Duplicate customer code' ? 'গ্রাহক কোড ডুপ্লিকেট' : item.reason === 'Duplicate mobile number' ? 'মোবাইল নাম্বার ডুপ্লিকেট' : item.reason}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
             {importStatus && !importErrors.length ? (

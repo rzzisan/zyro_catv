@@ -937,6 +937,96 @@ a {
   color: #1a805f;
 }
 
+/* Import Skipped Records Section */
+.import-skipped-section {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  background: #fff9f0;
+  border: 1px solid #f0d8b0;
+  border-radius: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.skipped-title {
+  margin: 0 0 0.8rem 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a25241;
+}
+
+.skipped-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.skipped-item {
+  background: #fff;
+  border: 1px solid #efe4d7;
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.skipped-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.skipped-row {
+  font-size: 0.75rem;
+  color: #999;
+  font-weight: 600;
+}
+
+.skipped-code {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(15, 124, 123, 0.08);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.skipped-details {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.3rem;
+}
+
+.skipped-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.skipped-mobile {
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.skipped-meta {
+  font-size: 0.78rem;
+  color: #999;
+  margin-bottom: 0.4rem;
+}
+
+.skipped-reason {
+  font-size: 0.82rem;
+  color: #a25241;
+  padding: 0.4rem 0.5rem;
+  background: rgba(162, 82, 65, 0.06);
+  border-radius: 6px;
+  border-left: 3px solid #a25241;
+}
+
+.skipped-reason strong {
+  font-weight: 700;
+}
+
 .balance-card {
   background: var(--surface);
   border-radius: var(--radius);
