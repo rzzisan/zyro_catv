@@ -311,11 +311,6 @@ router.post(
       const existingCodes = new Set(
         existing.map((item) => normalizeValue(item.customerCode).toLowerCase())
       )
-      const existingMobiles = new Set(
-        existing
-          .map((item) => normalizeValue(item.mobile))
-          .filter((value) => value)
-      )
 
       let created = 0
       let skipped = 0
@@ -376,11 +371,9 @@ router.post(
         }
 
         const codeKey = customerCode.toLowerCase()
-        if (existingCodes.has(codeKey) || (mobile && existingMobiles.has(mobile))) {
+        if (existingCodes.has(codeKey)) {
           skipped += 1
-          const reason = existingCodes.has(codeKey)
-            ? 'Duplicate customer code'
-            : 'Duplicate mobile number'
+          const reason = 'Duplicate customer code'
           skippedRecords.push({
             row: rowNumber,
             customerCode,
