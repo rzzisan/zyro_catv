@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -84,13 +85,13 @@ const getUserRole = () => {
 }
 
 // Menu options for three-dot menu
-const MenuDialog = ({ customer, onClose, onBillCollect, onBillReport, onCall, menuRef }) => {
+const MenuDialog = ({ customer, onClose, onBillCollect, onBillReport, onCall, onViewDetails, menuRef }) => {
   return (
     <div className="menu-popover" ref={menuRef}>
       <button
         className="menu-item"
         onClick={() => {
-          alert(`গ্রাহক প্রোফাইল: ${customer.name} (${customer.customerCode || customer.id})`)
+          onViewDetails(customer)
           onClose()
         }}
         title="গ্রাহক প্রোফাইল"
@@ -202,6 +203,7 @@ const CustomerListItem = ({ customer, onMenuClick, selectedStatus }) => {
 }
 
 function CollectorBilling() {
+  const navigate = useNavigate()
   const [areas, setAreas] = useState([])
   const [customers, setCustomers] = useState([])
   const [selectedArea, setSelectedArea] = useState('')
@@ -417,10 +419,15 @@ function CollectorBilling() {
     }
   }
 
+  const handleViewDetails = (row) => {
+    navigate(`/customers/${row.customerId || row.id}`)
+  }
+
   const menuHandlers = {
     onBillCollect: handleBillCollect,
     onBillReport: handleBillReport,
     onCall: handleCall,
+    onViewDetails: handleViewDetails,
   }
 
   const currentStatus = statusOptions.find((s) => s.value === selectedStatus)

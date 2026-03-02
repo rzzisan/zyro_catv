@@ -702,8 +702,66 @@ router.get('/history/:customerId', requireAuth, requireRole(['ADMIN', 'MANAGER',
   }
 })
 
+router.patch('/bills/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const { amount } = req.body
+    const parsedAmount = Number(amount)
+    
+    if (!Number.isInteger(parsedAmount) || parsedAmount < 0) {
+      return res.status(400).json({ error: 'Invalid amount' })
+    }
+
+    const bill = await prisma.bill.findFirst({
+      where: { id: req.params.billId, companyId: req.user.companyId },
+      include: { customer: { select: { id: true } } },
+    })
+
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' })
+    }
+
+    const allocations = await prisma.paymentAllocation.findMany({
+      where: { billId: bill.id },
+      select: { amount: true },
+    })
+    const paidTotal = allocations.reduce((sum, item) => sum + item.amount, 0)
+
+    const updatedBill = await prisma.bill.update({
+      where: { id: bill.id },
+      data: {
+        amount: parsedAmount,
+        status: normalizeStatus(parsedAmount, paidTotal),
+      },
+    })
+
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'UPDATE',
+          entityType: 'Bill',
+          entityId: bill.id,
+          oldData: { amount: bill.amount },
+          newData: { amount: parsedAmount },
+          status: 'SUCCESS',
+          companyId: req.user.companyId,
+        },
+      })
+    } catch (logError) {
+      console.error('Activity log error:', logError)
+    }
+
+    await recalculateCustomerDueBalance(bill.customer.id)
+
+    return res.json({ data: updatedBill })
+  } catch (error) {
+    return next(error)
+  }
+})
+
 router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
   try {
+    const { remark } = req.body
     const payment = await prisma.payment.findFirst({
       where: { id: req.params.paymentId, bill: { companyId: req.user.companyId } },
       include: { bill: { select: { id: true, customerId: true, amount: true } } },
@@ -720,7 +778,7 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
 
     const billIds = allocations.map((item) => item.billId)
     
-    // Audit trail - deletion রেকর্ড করুন আগে থেকে
+    // Audit trail - deletion রেকর্ড করুন আগে থেকে with remark
     try {
       await prisma.activityLog.create({
         data: {
@@ -735,6 +793,7 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
             paidAt: payment.paidAt,
             method: payment.method,
             collectedById: payment.collectedById,
+            remark: remark || null,
           },
           status: 'SUCCESS',
           companyId: req.user.companyId,

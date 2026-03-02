@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -17,6 +18,7 @@ const billingLabel = (value) => {
 }
 
 function Customers() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [areas, setAreas] = useState([])
   const [types, setTypes] = useState([])
@@ -423,6 +425,13 @@ function Customers() {
                 <td>৳ {row.dueBalance ?? 0}</td>
                 <td>
                   <div className="action-buttons">
+                    <button
+                      className="btn ghost small"
+                      type="button"
+                      onClick={() => navigate(`/customers/${row.id}`)}
+                    >
+                      ডিটেইলস
+                    </button>
                     <button className="btn ghost small" type="button" onClick={() => handleEdit(row)}>
                       এডিট
                     </button>

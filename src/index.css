@@ -1833,3 +1833,115 @@ a {
   }
 
 }
+
+/* Customer Details Page */
+.customer-profile-section {
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.profile-row:last-child {
+  margin-bottom: 0;
+}
+
+.profile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.profile-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.profile-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tabs-container {
+  margin-top: 2rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--bg-strong);
+  margin-bottom: 1.5rem;
+}
+
+.tabs .tab {
+  background: transparent;
+  border: none;
+  padding: 0.9rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 0;
+  border-bottom: 3px solid transparent;
+  transition: all 0.25s ease;
+}
+
+.tabs .tab:hover {
+  color: var(--primary);
+  background: var(--surface-alt);
+}
+
+.tabs .tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-content {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .tabs {
+    flex-direction: column;
+    border-bottom: none;
+  }
+
+  .tabs .tab {
+    border-bottom: 1px solid var(--bg-strong);
+    border-radius: var(--radius);
+  }
+
+  .tabs .tab.active {
+    background: var(--surface-alt);
+  }
+
+  .customer-profile-section {
+    padding: 1rem;
+  }
+}
+

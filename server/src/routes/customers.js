@@ -505,4 +505,85 @@ router.delete('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req
   }
 })
 
+router.get('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
+  try {
+    const customer = await prisma.customer.findFirst({
+      where: { id: req.params.id, companyId: req.user.companyId, deletedAt: null },
+      include: {
+        area: { select: { id: true, name: true } },
+        customerType: { select: { id: true, name: true } },
+      },
+    })
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' })
+    }
+
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      if (!areaIds.includes(customer.areaId)) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
+    }
+
+    const bills = await prisma.bill.findMany({
+      where: { customerId: customer.id },
+      orderBy: [
+        { periodYear: 'desc' },
+        { periodMonth: 'desc' },
+      ],
+    })
+
+    const billIds = bills.map((bill) => bill.id)
+    const allocations = billIds.length
+      ? await prisma.paymentAllocation.findMany({
+          where: { billId: { in: billIds } },
+          select: { billId: true, amount: true, paymentId: true },
+        })
+      : []
+
+    const allocationMap = allocations.reduce((acc, row) => {
+      acc[row.billId] = (acc[row.billId] || 0) + row.amount
+      return acc
+    }, {})
+
+    const billsWithPaid = bills.map((bill) => ({
+      ...bill,
+      paidTotal: allocationMap[bill.id] || 0,
+    }))
+
+    const payments = await prisma.payment.findMany({
+      where: { bill: { customerId: customer.id } },
+      include: {
+        collectedBy: { select: { id: true, name: true } },
+        bill: { select: { periodMonth: true, periodYear: true } },
+      },
+      orderBy: { paidAt: 'desc' },
+    })
+
+    const totalGenerated = bills.reduce((sum, bill) => sum + bill.amount, 0)
+    const totalCollected = payments.reduce((sum, payment) => sum + payment.amount, 0)
+    const totalDue = totalGenerated - totalCollected
+
+    return res.json({
+      data: {
+        customer,
+        bills: billsWithPaid,
+        payments,
+        summary: {
+          totalGenerated,
+          totalCollected,
+          totalDue,
+        },
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
 export default router
