@@ -8,7 +8,7 @@ const apiBase = import.meta.env.PROD
 
 const statusOptions = [
   { value: '', label: 'সব' },
-  { value: 'DUE', label: 'বকেয়া' },
+  { value: 'DUE', label: 'বকেয়া' },
   { value: 'PARTIAL', label: 'আংশিক পরিশোধ' },
   { value: 'PAID', label: 'পরিশোধ' },
   { value: 'ADVANCE', label: 'অগ্রিম' },
@@ -151,7 +151,7 @@ function Billing() {
       if (areasRes.ok) setAreas(areasData.data || [])
       if (collectorsRes.ok) setCollectors(collectorsData.data || [])
     } catch (error) {
-      setStatus('ফিল্টার লোড করা যায়নি')
+      setStatus('ফিল্টার লোড করা যায়নি')
     }
   }
 
@@ -172,7 +172,7 @@ function Billing() {
         })
       }
     } catch (error) {
-      setStatus('কোম্পানি তথ্য লোড করা যায়নি')
+      setStatus('কোম্পানি তথ্য লোড করা যায়নি')
     }
   }
 
@@ -186,7 +186,7 @@ function Billing() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'বিল লোড করা যায়নি')
+        throw new Error(data.error || 'বিল লোড করা যায়নি')
       }
       setRows(data.data || [])
       setSummary(data.summary || summary)
@@ -215,6 +215,7 @@ function Billing() {
   }, [filters, perPage])
 
   const openCollectModal = (row) => {
+    // Range validation: bökaya থেকে বেশি নিন না
     const maxAmount = row.totalDue > 0 ? row.totalDue : row.amount
     const defaultAmount = row.dueCurrent > 0 ? Math.min(row.dueCurrent, maxAmount) : 0
     
@@ -229,55 +230,28 @@ function Billing() {
   const handleCollectSubmit = async (event) => {
     event.preventDefault()
     if (!token || !collecting) return
-    
-    const amount = Number(collectForm.amount)
-    if (!Number.isInteger(amount) || amount <= 0) {
-      setStatus('পরিমাণ অবশ্যই ১ এর চেয়ে বেশি পূর্ণ সংখ্যা হতে হবে')
-      return
-    }
-    if (amount > 9999999) {
-      setStatus('পরিমাণ খুব বেশি')
-      return
-    }
-    
     setIsLoading(true)
     setStatus('')
-    const billIdToOpen = collecting.billId
-    
     try {
-      const idempotencyKey = `${collecting.billId}-${Date.now()}-${Math.random()}`
-      
       const response = await fetch(`${apiBase}/billing/collect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify({
           billId: collecting.billId,
-          amount: Math.floor(amount),
-          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : new Date().toISOString(),
+          amount: Number(collectForm.amount),
+          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : undefined,
           method: collectForm.method,
-          idempotencyKey,
         }),
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
+        throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
       }
-      
       setCollecting(null)
-      setCollectForm({
-        amount: '',
-        paidAt: formatDateTimeValue(new Date()),
-        method: 'CASH',
-      })
-      
       await loadBilling()
-      window.open(`/invoice/${billIdToOpen}`, '_blank', 'noopener')
-      setStatus('পেমেন্ট সফলভাবে গৃহীত হয়েছে')
-      setTimeout(() => setStatus(''), 3000)
     } catch (error) {
       setStatus(error.message)
     } finally {
@@ -295,7 +269,7 @@ function Billing() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'হিস্টোরি লোড করা যায়নি')
+        throw new Error(data.error || 'হিস্টোরি লোড করা যায়নি')
       }
       setHistoryRows(data.data || [])
     } catch (error) {
@@ -329,7 +303,7 @@ function Billing() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'ডিলিট ব্যর্থ হয়েছে')
+        throw new Error(data.error || 'ডিলিট ব্যর্থ হয়েছে')
       }
       if (historyFor) {
         await loadHistory(historyFor.customerId)
@@ -368,7 +342,7 @@ function Billing() {
           </div>
           <div className="metric-card">
             <div className="metric-value">{formatCurrency(summary.totalDue)}</div>
-            <div className="metric-label">মোট বকেয়া</div>
+            <div className="metric-label">মোট বকেয়া</div>
           </div>
           <div className="metric-card">
             <div className="metric-value">{formatCurrency(summary.totalAdvance)}</div>
@@ -377,7 +351,7 @@ function Billing() {
         </div>
         <div className="filter-grid">
           <label className="filter-item">
-            <span>এরিয়া</span>
+            <span>এরিয়া</span>
             <select
               value={filters.areaId}
               onChange={(event) => setFilters((prev) => ({ ...prev, areaId: event.target.value }))}
@@ -450,11 +424,11 @@ function Billing() {
           <thead>
             <tr>
               <th>গ্রাহক</th>
-              <th>এরিয়া</th>
+              <th>এরিয়া</th>
               <th>স্ট্যাটাস</th>
               <th>মাসিক</th>
               <th>পরিশোধ</th>
-              <th>বকেয়া</th>
+              <th>বকেয়া</th>
               <th>অ্যাকশন</th>
             </tr>
           </thead>
@@ -484,7 +458,7 @@ function Billing() {
                       হিস্টোরি
                     </button>
                     <button className="btn outline small" type="button" onClick={() => handlePrint(row)}>
-                      ইনভয়েস
+                      ইনভয়েস
                     </button>
                   </div>
                 </td>
@@ -539,7 +513,7 @@ function Billing() {
                   <input type="text" value={`${collecting.name} (${collecting.customerCode})`} disabled />
                 </label>
                 <label className="field">
-                  <span>বর্তমান বকেয়া</span>
+                  <span>বর্তমান বকেয়া</span>
                   <input type="text" value={formatCurrency(collecting.totalDue)} disabled />
                 </label>
                 <label className="field">
@@ -553,7 +527,7 @@ function Billing() {
                   />
                 </label>
                 <label className="field">
-                  <span>তারিখ ও সময়</span>
+                  <span>তারিখ ও সময়</span>
                   <input
                     type="datetime-local"
                     value={collectForm.paidAt}
@@ -608,14 +582,14 @@ function Billing() {
               </div>
               {historyLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
               {!historyLoading && !historyRows.length ? (
-                <div className="module-sub">কোনো হিস্টোরি পাওয়া যায়নি</div>
+                <div className="module-sub">কোনো হিস্টোরি পাওয়া যায়নি</div>
               ) : null}
               {historyRows.length ? (
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>তারিখ</th>
-                      <th>মাস সমন্বয়</th>
+                      <th>মাস সমন্বয়</th>
                       <th>কালেক্টর</th>
                       <th>মেথড</th>
                       <th>পরিমাণ</th>

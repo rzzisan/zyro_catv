@@ -178,6 +178,7 @@ model Customer {
   dueBalance     Int         @default(0)
   connectionDate DateTime
   createdById    String?
+  deletedAt      DateTime?   // Soft delete field
   createdAt      DateTime    @default(now())
   company        Company     @relation(fields: [companyId], references: [id])
   area           Area        @relation(fields: [areaId], references: [id])
@@ -187,6 +188,7 @@ model Customer {
 
   @@unique([companyId, customerCode])
   @@index([companyId, mobile])
+  @@index([companyId, deletedAt])
 }
 
 model Bill {

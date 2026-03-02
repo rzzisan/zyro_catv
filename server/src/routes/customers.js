@@ -126,6 +126,7 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
 
     const where = {
       companyId: req.user.companyId,
+      deletedAt: null, // Exclude soft-deleted customers
     }
 
     if (areaId) {
@@ -405,7 +406,7 @@ router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req,
     }
 
     const existing = await prisma.customer.findFirst({
-      where: { id: req.params.id, companyId: req.user.companyId },
+      where: { id: req.params.id, companyId: req.user.companyId, deletedAt: null },
     })
 
     if (!existing) {
@@ -450,20 +451,56 @@ router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req,
 router.delete('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const existing = await prisma.customer.findFirst({
-      where: { id: req.params.id, companyId: req.user.companyId },
+      where: { id: req.params.id, companyId: req.user.companyId, deletedAt: null },
+      include: { bills: { select: { id: true } } },
     })
 
     if (!existing) {
       return res.status(404).json({ error: 'Customer not found' })
     }
 
-    await prisma.customer.delete({ where: { id: existing.id } })
-
-    return res.json({ ok: true })
-  } catch (error) {
-    if (error.code === 'P2003') {
-      return res.status(409).json({ error: 'Customer has related records' })
+    if (existing.deletedAt) {
+      return res.status(409).json({ error: 'Customer already deleted' })
     }
+
+    const suffix = `__DEL__${existing.id.slice(-10)}`
+    const maxCodeLength = 191
+    const baseLength = Math.max(0, maxCodeLength - suffix.length)
+    const archivedCustomerCode = `${String(existing.customerCode || '').slice(0, baseLength)}${suffix}`
+
+    // Soft delete - গ্রাহক soft delete করি কিন্তু বিল থেকে যায়
+    await prisma.customer.update({
+      where: { id: existing.id },
+      data: {
+        deletedAt: new Date(),
+        customerCode: archivedCustomerCode,
+      },
+    })
+
+    // Audit trail - deletion রেকর্ড করি
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'DELETE',
+          entityType: 'Customer',
+          entityId: existing.id,
+          oldData: {
+            id: existing.id,
+            name: existing.name,
+            customerCode: existing.customerCode,
+            mobile: existing.mobile,
+          },
+          status: 'SUCCESS',
+          companyId: req.user.companyId,
+        },
+      })
+    } catch (logError) {
+      console.error('Activity log error:', logError)
+    }
+
+    return res.json({ ok: true, message: 'গ্রাহক সফলভাবে ডিলিট হয়েছে। বিল ও পেমেন্ট রেকর্ড থেকে যাবে।' })
+  } catch (error) {
     return next(error)
   }
 })

@@ -274,10 +274,12 @@ function CollectorBilling() {
   }, [selectedArea, selectedStatus, searchQuery, token])
 
   const openCollectModal = (row) => {
-    const defaultAmount = row.dueCurrent > 0 ? row.dueCurrent : row.amount
+    const maxAmount = row.totalDue > 0 ? row.totalDue : row.amount
+    const defaultAmount = row.dueCurrent > 0 ? Math.min(row.dueCurrent, maxAmount) : 0
+    
     setCollecting(row)
     setCollectForm({
-      amount: defaultAmount ? String(defaultAmount) : '',
+      amount: defaultAmount ? String(Math.floor(defaultAmount)) : '',
       paidAt: formatDateTimeValue(new Date()),
       method: 'CASH',
     })
@@ -286,29 +288,55 @@ function CollectorBilling() {
   const handleCollectSubmit = async (event) => {
     event.preventDefault()
     if (!token || !collecting) return
+    
+    const amount = Number(collectForm.amount)
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setError('পরিমাণ অবশ্যই ১ এর চেয়ে বেশি পূর্ণ সংখ্যা হতে হবে')
+      return
+    }
+    if (amount > 9999999) {
+      setError('পরিমাণ খুব বেশি')
+      return
+    }
+    
     setLoading(true)
     setError('')
+    const billIdToOpen = collecting.billId
+    
     try {
+      const idempotencyKey = `${collecting.billId}-${Date.now()}-${Math.random()}`
+      
       const response = await fetch(`${apiBase}/billing/collect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify({
           billId: collecting.billId,
-          amount: Number(collectForm.amount),
-          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : undefined,
+          amount: Math.floor(amount),
+          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : new Date().toISOString(),
           method: collectForm.method,
+          idempotencyKey,
         }),
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
+        throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
       }
+      
       setCollecting(null)
+      setCollectForm({
+        amount: '',
+        paidAt: formatDateTimeValue(new Date()),
+        method: 'CASH',
+      })
+      
       await fetchCustomers()
-      window.open(`/invoice/${collecting.billId}`, '_blank', 'noopener')
+      window.open(`/invoice/${billIdToOpen}`, '_blank', 'noopener')
+      setError('পেমেন্ট সফলভাবে গৃহীত হয়েছে')
+      setTimeout(() => setError(''), 3000)
     } catch (error) {
       setError(error.message)
     } finally {
@@ -326,7 +354,7 @@ function CollectorBilling() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'হিস্টোরি লোড করা যায়নি')
+        throw new Error(data.error || 'হিস্টোরি লোড করা যায়নি')
       }
       setHistoryRows(data.data || [])
     } catch (error) {
@@ -360,7 +388,7 @@ function CollectorBilling() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'ডিলিট ব্যর্থ হয়েছে')
+        throw new Error(data.error || 'ডিলিট ব্যর্থ হয়েছে')
       }
       if (historyFor) {
         await loadHistory(historyFor.customerId)
@@ -501,7 +529,7 @@ function CollectorBilling() {
                   />
                 </label>
                 <label className="field">
-                  <span>বর্তমান বকেয়া</span>
+                  <span>বর্তমান বকেয়া</span>
                   <input type="text" value={formatCurrency(collecting.totalDue)} disabled />
                 </label>
                 <label className="field">
@@ -517,7 +545,7 @@ function CollectorBilling() {
                   />
                 </label>
                 <label className="field">
-                  <span>তারিখ ও সময়</span>
+                  <span>তারিখ ও সময়</span>
                   <input
                     type="datetime-local"
                     value={collectForm.paidAt}
@@ -581,14 +609,14 @@ function CollectorBilling() {
               </div>
               {historyLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
               {!historyLoading && !historyRows.length ? (
-                <div className="module-sub">কোনো হিস্টোরি পাওয়া যায়নি</div>
+                <div className="module-sub">কোনো হিস্টোরি পাওয়া যায়নি</div>
               ) : null}
               {historyRows.length ? (
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>তারিখ</th>
-                      <th>মাস সমন্বয়</th>
+                      <th>মাস সমন্বয়</th>
                       <th>কালেক্টর</th>
                       <th>মেথড</th>
                       <th>পরিমাণ</th>

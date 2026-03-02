@@ -5,18 +5,67 @@ import { requireAuth, requireRole } from '../lib/auth.js'
 
 const router = express.Router()
 
+const PAYMENT_METHODS = ['CASH', 'BKASH', 'NAGAD', 'BANK', 'CHEQUE', 'DD']
+
 const collectSchema = z.object({
   billId: z.string().min(1),
-  amount: z.preprocess((value) => Number(value), z.number().positive()),
-  paidAt: z.string().optional(),
-  method: z.string().max(40).optional().nullable(),
+  amount: z.preprocess((value) => {
+    const num = Number(value)
+    if (Number.isNaN(num)) return NaN
+    // Convert to Taka (whole number only - no decimals)
+    return Math.floor(num)
+  }, z.number().int().positive('পরিমাণ অবশ্যই ১ এর চেয়ে বেশি হতে হবে')),
+  paidAt: z.string().datetime().optional(),
+  method: z.enum(PAYMENT_METHODS).optional().nullable(),
+  idempotencyKey: z.string().optional(), // সম্ভাব্য duplicate payment রোধ করতে
 })
 
 const normalizeStatus = (amount, paidTotal) => {
-  if (paidTotal > amount) return 'ADVANCE'
-  if (paidTotal === amount && amount > 0) return 'PAID'
-  if (paidTotal > 0 && paidTotal < amount) return 'PARTIAL'
+  // Amount 0 হলে সবসময় DUE রিটার্ন করুন
+  if (amount <= 0) return 'DUE'
+  // Paid total zero এর চেয়ে বেশি হলে ADVANCE হতে পারে
+  if (paidTotal >= amount) {
+    return paidTotal === amount ? 'PAID' : 'ADVANCE'
+  }
+  if (paidTotal > 0) return 'PARTIAL'
   return 'DUE'
+}
+
+const recalculateCustomerDueBalance = async (customerId) => {
+  const bills = await prisma.bill.findMany({
+    where: { customerId },
+    select: { id: true, amount: true },
+  })
+
+  if (!bills.length) {
+    await prisma.customer.update({
+      where: { id: customerId },
+      data: { dueBalance: 0 },
+    })
+    return 0
+  }
+
+  const allocations = await prisma.paymentAllocation.findMany({
+    where: { billId: { in: bills.map((item) => item.id) } },
+    select: { billId: true, amount: true },
+  })
+
+  const allocationMap = allocations.reduce((acc, row) => {
+    acc[row.billId] = (acc[row.billId] || 0) + row.amount
+    return acc
+  }, {})
+
+  const totalDue = bills.reduce((sum, item) => {
+    const paid = allocationMap[item.id] || 0
+    return sum + Math.max(0, item.amount - paid)
+  }, 0)
+
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { dueBalance: totalDue },
+  })
+
+  return totalDue
 }
 
 const toMonthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`
@@ -102,6 +151,7 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
     const customerWhere = {
       companyId: req.user.companyId,
       billingType: 'ACTIVE',
+      deletedAt: null, // Exclude soft-deleted customers
     }
 
     if (req.user.role === 'COLLECTOR') {
@@ -299,7 +349,6 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
         area: customer.area,
         customerType: customer.customerType,
         monthlyFee: customer.monthlyFee ?? 0,
-        dueBalance: customer.dueBalance ?? 0,
         amount: bill.amount,
         paidTotal,
         status: billStatus,
@@ -351,6 +400,20 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
     }
 
     const payload = parsed.data
+    
+    // Idempotency check - একই পেমেন্ট দুবার না হওয়ার জন্য
+    if (payload.idempotencyKey) {
+      const existingPayment = await prisma.payment.findFirst({
+        where: {
+          bill: { companyId: req.user.companyId },
+          method: payload.idempotencyKey,
+        },
+      })
+      if (existingPayment) {
+        return res.status(409).json({ error: 'Payment already processed', data: { billId: existingPayment.billId } })
+      }
+    }
+    
     const bill = await prisma.bill.findFirst({
       where: { id: payload.billId, companyId: req.user.companyId },
       include: {
@@ -361,6 +424,7 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
             customerCode: true,
             monthlyFee: true,
             dueBalance: true,
+            billingType: true,
             connectionDate: true,
             areaId: true,
           },
@@ -370,6 +434,23 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
 
     if (!bill) {
       return res.status(404).json({ error: 'Bill not found' })
+    }
+    
+    // গ্রাহক status চেক - শুধু ACTIVE গ্রাহকদের জন্য পেমেন্ট accept
+    if (bill.customer.billingType !== 'ACTIVE') {
+      return res.status(400).json({ error: `গ্রাহক ${bill.customer.billingType} স্ট্যাটাসে রয়েছে। পেমেন্ট গ্রহণযোগ্য নয়।` })
+    }
+    
+    // Collector এর এরিয়া assignment চেক
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      if (!areaIds.includes(bill.customer.areaId)) {
+        return res.status(403).json({ error: 'এই এরিয়ায় আপনার assignment নেই' })
+      }
     }
 
     const paidAt = payload.paidAt ? new Date(payload.paidAt) : new Date()
@@ -390,62 +471,9 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
     const now = new Date()
     const monthlyFee = bill.customer.monthlyFee
 
-    let monthTargets = []
-    if (billingSystem === 'POSTPAID') {
-      const endDate = addMonths(monthStart(now), -1)
-      const totalDue = (bill.customer.dueBalance || 0) + bill.amount
-      const dueMonths = Math.max(1, Math.ceil(totalDue / monthlyFee))
-      monthTargets = buildTrailingMonths(endDate, dueMonths)
-    } else {
-      const startDate = monthStart(now)
-      const monthsNeeded = Math.max(1, Math.ceil(payload.amount / monthlyFee))
-      monthTargets = Array.from({ length: monthsNeeded }).map((_, index) => {
-        const date = addMonths(startDate, index)
-        return { year: date.getFullYear(), month: date.getMonth() + 1 }
-      })
-    }
-
-    if (!monthTargets.length) {
-      return res.status(400).json({ error: 'No billing months available' })
-    }
-
-    const monthConditions = monthTargets.map((item) => ({
-      periodMonth: item.month,
-      periodYear: item.year,
-    }))
-
-    const existingBills = await prisma.bill.findMany({
+    const billsForPayment = await prisma.bill.findMany({
       where: {
         customerId: bill.customer.id,
-        OR: monthConditions,
-      },
-    })
-
-    const existingMap = new Map(
-      existingBills.map((item) => [toMonthKey(item.periodYear, item.periodMonth), item])
-    )
-
-    const missingTargets = monthTargets.filter(
-      (item) => !existingMap.has(toMonthKey(item.year, item.month))
-    )
-
-    if (missingTargets.length) {
-      await prisma.bill.createMany({
-        data: missingTargets.map((item) => ({
-          companyId: req.user.companyId,
-          customerId: bill.customer.id,
-          periodMonth: item.month,
-          periodYear: item.year,
-          amount: monthlyFee,
-          status: 'DUE',
-        })),
-      })
-    }
-
-    let billsForPayment = await prisma.bill.findMany({
-      where: {
-        customerId: bill.customer.id,
-        OR: monthConditions,
       },
       orderBy: [
         { periodYear: 'asc' },
@@ -476,53 +504,88 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
     }
 
     if (remaining > 0) {
+      const latestBill = billsForPayment[billsForPayment.length - 1]
       let safety = 0
-      let cursorDate = monthTargets.length
-        ? addMonths(monthStart(new Date(monthTargets[monthTargets.length - 1].year, monthTargets[monthTargets.length - 1].month - 1, 1)), 1)
+      let cursorDate = latestBill
+        ? addMonths(monthStart(new Date(latestBill.periodYear, latestBill.periodMonth - 1, 1)), 1)
         : monthStart(now)
 
-      while (remaining > 0 && safety < 24) {
-        const year = cursorDate.getFullYear()
-        const month = cursorDate.getMonth() + 1
-        const newBill = await prisma.bill.upsert({
-          where: {
-            customerId_periodMonth_periodYear: {
-              customerId: bill.customer.id,
-              periodMonth: month,
-              periodYear: year,
-            },
-          },
-          update: {},
-          create: {
-            companyId: req.user.companyId,
+// সর্বোচ্চ ৬ মাস পর্যন্ত সামনের দিকে বিল তৈরি করুন
+    while (remaining > 0 && safety < 6) {
+      const year = cursorDate.getFullYear()
+      const month = cursorDate.getMonth() + 1
+      const newBill = await prisma.bill.upsert({
+        where: {
+          customerId_periodMonth_periodYear: {
             customerId: bill.customer.id,
             periodMonth: month,
             periodYear: year,
-            amount: monthlyFee,
-            status: 'DUE',
           },
-        })
-        const applied = Math.min(monthlyFee, remaining)
-        allocations.push({ billId: newBill.id, amount: applied })
-        remaining -= applied
-        cursorDate = addMonths(cursorDate, 1)
-        safety += 1
+        },
+        update: {},
+        create: {
+          companyId: req.user.companyId,
+          customerId: bill.customer.id,
+          periodMonth: month,
+          periodYear: year,
+          amount: monthlyFee,
+          status: 'DUE',
+        },
+      })
+      const applied = Math.min(monthlyFee, remaining)
+      allocations.push({ billId: newBill.id, amount: applied })
+      remaining -= applied
+      cursorDate = addMonths(cursorDate, 1)
+      safety += 1
+    }
+    
+    // যদি সীমার পরেও টাকা অবশিষ্ট থাকে, তাহলে ADVANCE amount এ রাখুন
+    if (remaining > 0) {
+      // শেষ bill এ অতিরিক্ত টাকা allocation করুন
+      if (allocations.length > 0) {
+        allocations[allocations.length - 1].amount += remaining
       }
     }
+  }
 
-    if (!allocations.length) {
-      return res.status(400).json({ error: 'No payable bills found' })
+  if (!allocations.length) {
+    return res.status(400).json({ error: 'কোনো পেমেন্টযোগ্য বিল পাওয়া যায়নি' })
     }
 
+    // Audit purpose এ idempotency key as method তে স্টোর করুন যদি থাকে
+    const methodValue = payload.method ? payload.method.trim() : null
+    
     const payment = await prisma.payment.create({
       data: {
         billId: allocations[0].billId,
         amount: payload.amount,
-        paidAt,
-        method: payload.method ? payload.method.trim() : null,
+        paidAt: paidAt.toISOString(), // timezone-aware
+        method: methodValue,
         collectedById: req.user.userId,
       },
     })
+    
+    // Audit trail - Activity log এ রেকর্ড করুন
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'CREATE',
+          entityType: 'Payment',
+          entityId: payment.id,
+          newData: {
+            billId: allocations[0].billId,
+            amount: payload.amount,
+            method: methodValue,
+          },
+          status: 'SUCCESS',
+          companyId: req.user.companyId,
+        },
+      })
+    } catch (logError) {
+      console.error('Activity log error:', logError)
+      // Log error হলেও payment সফল হবে
+    }
 
     await prisma.paymentAllocation.createMany({
       data: allocations.map((item) => ({
@@ -555,6 +618,8 @@ router.post('/collect', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR
         })
       )
     )
+
+    await recalculateCustomerDueBalance(bill.customer.id)
 
     return res.json({
       data: {
@@ -633,6 +698,7 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
   try {
     const payment = await prisma.payment.findFirst({
       where: { id: req.params.paymentId, bill: { companyId: req.user.companyId } },
+      include: { bill: { select: { id: true, customerId: true, amount: true } } },
     })
 
     if (!payment) {
@@ -645,7 +711,33 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
     })
 
     const billIds = allocations.map((item) => item.billId)
+    
+    // Audit trail - deletion রেকর্ড করুন আগে থেকে
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: req.user.userId,
+          action: 'DELETE',
+          entityType: 'Payment',
+          entityId: payment.id,
+          oldData: {
+            id: payment.id,
+            billId: payment.bill.id,
+            amount: payment.amount,
+            paidAt: payment.paidAt,
+            method: payment.method,
+            collectedById: payment.collectedById,
+          },
+          status: 'SUCCESS',
+          companyId: req.user.companyId,
+        },
+      })
+    } catch (logError) {
+      console.error('Activity log error:', logError)
+    }
 
+    // প্রথমে allocations delete করি, তারপর payment
+    await prisma.paymentAllocation.deleteMany({ where: { paymentId: payment.id } })
     await prisma.payment.delete({ where: { id: payment.id } })
 
     if (billIds.length) {
@@ -672,6 +764,8 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
         )
       )
     }
+
+    await recalculateCustomerDueBalance(payment.bill.customerId)
 
     return res.json({ ok: true })
   } catch (error) {

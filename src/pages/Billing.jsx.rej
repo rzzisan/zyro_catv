@@ -1,0 +1,56 @@
+--- src/pages/Billing.jsx
++++ src/pages/Billing.jsx
+@@ -229,24 +229,51 @@ function Billing() {
+   const handleCollectSubmit = async (event) => {
+     event.preventDefault()
+     if (!token || !collecting) return
++    
++    // Frontend validation
++    const amount = Number(collectForm.amount)
++    if (!Number.isInteger(amount) || amount <= 0) {
++      setStatus('পরিমাণ অবশ্যই ১ এর চেয়ে বেশি পূর্ণ সংখ্যা হতে হবে')
++      return
++    }
++    if (amount > 9999999) {
++      setStatus('পরিমাণ খুব বেশি')
++      return
++    }
++    
+     setIsLoading(true)
+     setStatus('')
++    const billIdToOpen = collecting.billId
++    
+     try {
++      const idempotencyKey = `${collecting.billId}-${Date.now()}-${Math.random()}`
++      
+       const response = await fetch(`${apiBase}/billing/collect`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+           Authorization: `Bearer ${token}`,
++          'Idempotency-Key': idempotencyKey,
+         },
+         body: JSON.stringify({\n           billId: collecting.billId,
+-          amount: Number(collectForm.amount),
+-          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : undefined,
++          amount: Math.floor(amount),
++          paidAt: collectForm.paidAt ? new Date(collectForm.paidAt).toISOString() : new Date().toISOString(),
+           method: collectForm.method,
++          idempotencyKey,
+         }),
+       })
+       const data = await response.json()
+       if (!response.ok) {
+         throw new Error(data.error || 'কালেকশন ব্যর্থ হয়েছে')
+       }
++      
+       setCollecting(null)
++      setCollectForm({
++        amount: '',
++        paidAt: formatDateTimeValue(new Date()),
++        method: 'CASH',
++      })
++      
+       await loadBilling()
++      window.open(`/invoice/${billIdToOpen}`, '_blank', 'noopener')
++      setStatus('পেমেন্ট সফলভাবে গৃহীত হয়েছে')

@@ -52,6 +52,7 @@ function Customers() {
   })
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const token = localStorage.getItem('auth_token')
 
@@ -234,6 +235,20 @@ function Customers() {
     }
   }
 
+  const openDelete = (row) => {
+    setDeleteTarget(row)
+  }
+
+  const closeDelete = () => {
+    setDeleteTarget(null)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    await handleDelete(deleteTarget)
+    setDeleteTarget(null)
+  }
+
   const handleImport = async (event) => {
     event.preventDefault()
     if (!token) return
@@ -400,8 +415,8 @@ function Customers() {
                 <td>{row.area?.name || '—'}</td>
                 <td>{row.customerType?.name || '—'}</td>
                 <td>
-                  <span className={`status-pill ${row.billingType.toLowerCase()}`}>
-                    {billingLabel(row.billingType)}
+                  <span className={`status-pill ${(row.billingType || 'ACTIVE').toLowerCase()}`}>
+                    {billingLabel(row.billingType || 'ACTIVE')}
                   </span>
                 </td>
                 <td>৳ {row.monthlyFee ?? 0}</td>
@@ -411,7 +426,7 @@ function Customers() {
                     <button className="btn ghost small" type="button" onClick={() => handleEdit(row)}>
                       এডিট
                     </button>
-                    <button className="btn outline small" type="button" onClick={() => handleDelete(row)}>
+                    <button className="btn outline small" type="button" onClick={() => openDelete(row)}>
                       ডিলিট
                     </button>
                   </div>
@@ -673,6 +688,38 @@ function Customers() {
             resetImport()
           }}
         />
+      </div>
+
+      <div className={`modal-overlay ${deleteTarget ? 'is-open' : ''}`}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <h3>গ্রাহক ডিলিট</h3>
+            <button className="btn outline" type="button" onClick={closeDelete}>
+              ✕
+            </button>
+          </div>
+          <div className="module-sub">
+            আপনি কি নিশ্চিত? {deleteTarget?.name} ডিলিট করবেন?
+            <br />
+            <em style={{ fontSize: '0.9em', marginTop: '8px', display: 'block', color: '#666' }}>
+              নোট: বিল ও পেমেন্ট রেকর্ড থেকে যাবে।
+            </em>
+          </div>
+          <div className="modal-actions">
+            <button className="btn ghost" type="button" onClick={closeDelete}>
+              না, থাক
+            </button>
+            <button className="btn outline" type="button" onClick={confirmDelete} disabled={isLoading}>
+              {isLoading ? 'ডিলিট হচ্ছে...' : 'হ্যাঁ, ডিলিট'}
+            </button>
+          </div>
+        </div>
+        <button className="modal-backdrop" type="button" aria-label="Close" onClick={closeDelete} />
       </div>
     </AppLayout>
   )
