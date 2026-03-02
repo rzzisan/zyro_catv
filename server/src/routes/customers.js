@@ -297,7 +297,7 @@ router.post(
           select: { id: true, name: true },
         }),
         prisma.customer.findMany({
-          where: { companyId: req.user.companyId },
+          where: { companyId: req.user.companyId, deletedAt: null },
           select: { customerCode: true, mobile: true },
         }),
       ])
@@ -501,6 +501,10 @@ router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req,
 
 router.delete('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
+    if (req.params.id === 'cleanup-all') {
+      return next()
+    }
+
     const existing = await prisma.customer.findFirst({
       where: { id: req.params.id, companyId: req.user.companyId, deletedAt: null },
       include: { bills: { select: { id: true } } },
@@ -631,6 +635,61 @@ router.get('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), 
           totalDue,
         },
       },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+// Admin: Hard delete all customers and related data for testing
+router.delete('/cleanup-all', requireAuth, requireRole(['ADMIN']), async (req, res, next) => {
+  try {
+    const { companyId } = req.user
+
+    const result = await prisma.$transaction(async (tx) => {
+      const bills = await tx.bill.findMany({
+        where: { companyId },
+        select: { id: true },
+      })
+      const billIds = bills.map((bill) => bill.id)
+
+      const paymentIds = billIds.length
+        ? (await tx.payment.findMany({
+            where: { billId: { in: billIds } },
+            select: { id: true },
+          })).map((payment) => payment.id)
+        : []
+
+      const deletedBillLogs = await tx.$executeRawUnsafe(
+        'DELETE bul FROM BillUpdateLog bul INNER JOIN Customer c ON c.id = bul.customerId WHERE c.companyId = ?',
+        companyId
+      )
+
+      const deletedAllocations = billIds.length
+        ? await tx.paymentAllocation.deleteMany({ where: { billId: { in: billIds } } })
+        : { count: 0 }
+
+      const deletedPayments = billIds.length
+        ? await tx.payment.deleteMany({ where: { billId: { in: billIds } } })
+        : { count: 0 }
+
+      const deletedBills = await tx.bill.deleteMany({ where: { companyId } })
+      const deletedCustomers = await tx.customer.deleteMany({ where: { companyId } })
+
+      return {
+        deletedBillLogs,
+        deletedAllocations: deletedAllocations.count,
+        deletedPayments: deletedPayments.count,
+        deletedBills: deletedBills.count,
+        deletedCustomers: deletedCustomers.count,
+        touchedPaymentIds: paymentIds.length,
+      }
+    })
+
+    res.json({
+      success: true,
+      message: 'সকল গ্রাহক এবং সংশ্লিষ্ট ডাটা মুছে ফেলা হয়েছে',
+      summary: result,
     })
   } catch (error) {
     return next(error)

@@ -1726,6 +1726,68 @@ a {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Collector Controls */
+.collector-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--bg-strong);
+  border-radius: 12px;
+}
+
+.collector-info {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Pagination */
+.pagination-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--bg-strong);
+  border-radius: 12px;
+  margin-top: 0.5rem;
+}
+
+.pagination-btn {
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #0d6866;
+  transform: translateY(-1px);
+}
+
+.pagination-btn:disabled {
+  background: #d9cfc2;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-weight: 600;
+  min-width: 140px;
+  text-align: center;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .collector-billing-container {

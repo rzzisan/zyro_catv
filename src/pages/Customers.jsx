@@ -17,6 +17,19 @@ const billingLabel = (value) => {
   return match ? match.label : value
 }
 
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
+}
+
 function Customers() {
   const navigate = useNavigate()
   const [rows, setRows] = useState([])
@@ -55,8 +68,10 @@ function Customers() {
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [selectedCustomers, setSelectedCustomers] = useState(new Set())
 
   const token = localStorage.getItem('auth_token')
+  const role = getUserRole()
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams()
@@ -245,6 +260,96 @@ function Customers() {
     setDeleteTarget(null)
   }
 
+  const handleSelectOne = (customerId) => {
+    setSelectedCustomers((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId)
+      } else {
+        newSet.add(customerId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedCustomers.size === rows.length) {
+      setSelectedCustomers(new Set())
+    } else {
+      setSelectedCustomers(new Set(rows.map((row) => row.id)))
+    }
+  }
+
+  const handleCleanupAll = async () => {
+    if (!token || role !== 'ADMIN') return
+    const ok = window.confirm(
+      '⚠️ সংকটাপূর্ণ ক্রিয়া!\n\nসকল গ্রাহক, বিল, পেমেন্ট এবং সংশ্লিষ্ট ডাটা স্থায়ীভাবে মুছে যাবে। এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।\n\nনিশ্চিত করুন?'
+    )
+    if (!ok) return
+
+    const doubleCheck = window.confirm(
+      'আবারও নিশ্চিত করুন: সম্পূর্ণ ডাটাবেস থেকে সকল গ্রাহক তথ্য মুছে ফেলা হবে।'
+    )
+    if (!doubleCheck) return
+
+    setIsLoading(true)
+    setStatus('')
+
+    try {
+      const response = await fetch(`${apiBase}/customers/cleanup-all`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setStatus(data.message || 'সকল গ্রাহক ডাটা মুছে ফেলা হয়েছে')
+        setSelectedCustomers(new Set())
+        await loadCustomers()
+      } else {
+        const error = await response.json()
+        setStatus(`ত্রুটি: ${error.error || 'কিছু ভুল হয়েছে'}`)
+      }
+    } catch (error) {
+      setStatus(`ত্রুটি: ${error.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (!token || role !== 'ADMIN' || selectedCustomers.size === 0) return
+    const count = selectedCustomers.size
+    const ok = window.confirm(`${count}টি গ্রাহক ডিলিট করবেন? এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।`)
+    if (!ok) return
+
+    setIsLoading(true)
+    setStatus('')
+    let deleted = 0
+    let failed = 0
+
+    for (const customerId of selectedCustomers) {
+      try {
+        const response = await fetch(`${apiBase}/customers/${customerId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (response.ok) {
+          deleted += 1
+        } else {
+          failed += 1
+        }
+      } catch (error) {
+        failed += 1
+      }
+    }
+
+    setSelectedCustomers(new Set())
+    setStatus(`${deleted}টি গ্রাহক ডিলিট হয়েছে${failed > 0 ? `, ${failed}টি ব্যর্থ হয়েছে` : ''}`)
+    await loadCustomers()
+    setIsLoading(false)
+  }
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     await handleDelete(deleteTarget)
@@ -295,6 +400,28 @@ function Customers() {
             <div className="module-sub">মোট {meta.total} জন</div>
           </div>
           <div className="action-buttons">
+            {role === 'ADMIN' && (
+              <button
+                className="btn danger"
+                type="button"
+                onClick={handleCleanupAll}
+                disabled={isLoading}
+                style={{ marginRight: '8px' }}
+              >
+                ⚠️ সম্পূর্ণ ডিলিট
+              </button>
+            )}
+            {role === 'ADMIN' && selectedCustomers.size > 0 && (
+              <button
+                className="btn danger"
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={isLoading}
+                style={{ marginRight: '8px' }}
+              >
+                বাল্ক ডিলিট ({selectedCustomers.size})
+              </button>
+            )}
             <button
               className="btn ghost"
               type="button"
@@ -377,6 +504,18 @@ function Customers() {
         </div>
         {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
         <div className="table-top-controls">
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {role === 'ADMIN' && selectedCustomers.size > 0 && (
+              <button
+                className="btn outline small"
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={isLoading}
+              >
+                ডিলিট ({selectedCustomers.size})
+              </button>
+            )}
+          </div>
           <label className="pagination-select">
             <span>দেখাও</span>
             <select
@@ -396,8 +535,16 @@ function Customers() {
         </div>
         <table className="data-table">
           <thead>
-            <tr>
-              <th>গ্রাহক</th>
+            <tr>              {role === 'ADMIN' && (
+                <th style={{ width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={rows.length > 0 && selectedCustomers.size === rows.length}
+                    onChange={handleSelectAll}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
+              )}              <th>গ্রাহক</th>
               <th>এরিয়া</th>
               <th>টাইপ</th>
               <th>বিলিং</th>
@@ -409,6 +556,16 @@ function Customers() {
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
+                {role === 'ADMIN' && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedCustomers.has(row.id)}
+                      onChange={() => handleSelectOne(row.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </td>
+                )}
                 <td>
                   <div className="cell-title">{row.name}</div>
                   <div className="cell-sub">{row.customerCode}</div>

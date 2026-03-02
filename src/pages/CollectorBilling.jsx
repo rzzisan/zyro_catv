@@ -221,6 +221,9 @@ function CollectorBilling() {
     paidAt: formatDateTimeValue(new Date()),
     method: 'CASH',
   })
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(50)
+  const [meta, setMeta] = useState({ total: 0, page: 1, perPage: 50, totalPages: 1 })
 
   const token = localStorage.getItem('auth_token')
   const role = getUserRole()
@@ -255,7 +258,12 @@ function CollectorBilling() {
       const params = new URLSearchParams()
       if (selectedArea) params.append('areaId', selectedArea)
       params.append('status', selectedStatus)
-      params.append('perPage', '1000')
+      if (perPage === 'all') {
+        params.append('limit', 'all')
+      } else {
+        params.append('limit', String(perPage))
+        params.append('page', String(page))
+      }
       if (searchQuery.trim()) params.append('q', searchQuery.trim())
       const res = await fetch(`${apiBase}/billing?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -263,6 +271,9 @@ function CollectorBilling() {
       if (!res.ok) throw new Error('Failed to fetch customers')
       const data = await res.json()
       setCustomers(data.data || [])
+      if (data.meta) {
+        setMeta(data.meta)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -270,10 +281,15 @@ function CollectorBilling() {
     }
   }
 
-  // Fetch customers when area or status changes
+  // Fetch customers when filters or pagination changes
   useEffect(() => {
     fetchCustomers()
-  }, [selectedArea, selectedStatus, searchQuery, token])
+  }, [selectedArea, selectedStatus, searchQuery, page, perPage, token])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [selectedArea, selectedStatus, searchQuery, perPage])
 
   const openCollectModal = (row) => {
     const maxAmount = row.totalDue > 0 ? row.totalDue : row.amount
@@ -476,6 +492,26 @@ function CollectorBilling() {
           />
         </div>
 
+        <div className="collector-controls">
+          <div className="collector-info">
+            মোট {meta.total} জন গ্রাহক
+          </div>
+          <label className="pagination-select">
+            <span>দেখাও</span>
+            <select
+              value={perPage}
+              onChange={(event) => {
+                const value = event.target.value
+                setPerPage(value === 'all' ? 'all' : Number(value))
+              }}
+            >
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value="all">সব</option>
+            </select>
+          </label>
+        </div>
+
         {/* Content Area */}
         <div className="collector-content">
           {error && (
@@ -509,6 +545,29 @@ function CollectorBilling() {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {!loading && customers.length > 0 && perPage !== 'all' && meta.totalPages > 1 && (
+          <div className="pagination-wrapper">
+            <button
+              className="pagination-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              ‹ পূর্ববর্তী
+            </button>
+            <div className="pagination-info">
+              পৃষ্ঠা {page} / {meta.totalPages}
+            </div>
+            <button
+              className="pagination-btn"
+              disabled={page >= meta.totalPages}
+              onClick={() => setPage((prev) => Math.min(meta.totalPages, prev + 1))}
+            >
+              পরবর্তী ›
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={`modal-overlay ${collecting ? 'is-open' : ''}`}>
