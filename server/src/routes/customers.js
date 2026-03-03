@@ -408,7 +408,6 @@ router.post(
           })
           created += 1
           existingCodes.add(codeKey)
-          if (mobile) existingMobiles.add(mobile)
 
           // যদি opening/arrear due (dueBalance) থাকে, তাহলে চলতি মাসে একটি bill তৈরি করি
           if (dueBalance > 0) {
@@ -419,14 +418,15 @@ router.post(
                   customerId: newCustomer.id,
                   periodMonth: currentMonth,
                   periodYear: currentYear,
-                  amount: dueBalance,
+                  amount: Math.floor(dueBalance),
                   status: 'DUE',
                 },
               })
             } catch (billError) {
-              // Duplicate bill ignore করি
+              // Duplicate bill ignore করি, অন্যথায় log করি কিন্তু customer create তো হয়েছে
               if (billError.code !== 'P2002') {
-                console.error('Opening bill creation error (import):', billError)
+                console.warn('Opening bill creation warning (import, row ' + rowNumber + '):', billError.message)
+                // Continue - customer is created even if bill fails
               }
             }
           }
@@ -460,6 +460,7 @@ router.post(
         skippedRecords: skippedRecords.slice(0, 50),
       })
     } catch (error) {
+      console.error('Bulk import error:', error)
       return next(error)
     }
   }

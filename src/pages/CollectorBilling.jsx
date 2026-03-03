@@ -156,7 +156,7 @@ const CustomerListItem = ({ customer, onMenuClick, selectedStatus }) => {
 
   return (
     <>
-      <div className="collector-customer-row">
+      <div className={`collector-customer-row ${showMenu ? 'menu-open' : ''}`}>
         <div
           className="customer-avatar"
           aria-hidden="true"
@@ -192,6 +192,7 @@ const CustomerListItem = ({ customer, onMenuClick, selectedStatus }) => {
                 onBillCollect={onMenuClick.onBillCollect}
                 onBillReport={onMenuClick.onBillReport}
                 onCall={onMenuClick.onCall}
+                onViewDetails={onMenuClick.onViewDetails}
                 menuRef={menuRef}
               />
             )}

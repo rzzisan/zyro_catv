@@ -1666,7 +1666,7 @@ a {
   gap: 0;
   border: 1px solid var(--bg-strong);
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
@@ -1681,6 +1681,11 @@ a {
   border-bottom: 1px solid var(--bg-strong);
   transition: background-color 0.2s ease;
   gap: 0.7rem;
+  position: relative;
+}
+
+.collector-customer-row.menu-open {
+  z-index: 40;
 }
 
 .collector-customer-row:last-child {
@@ -1781,6 +1786,7 @@ a {
 /* Menu Popover */
 .menu-anchor {
   position: relative;
+  z-index: 2;
 }
 
 .menu-popover {
