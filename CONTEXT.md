@@ -3,6 +3,20 @@
 ## Environment
 **PRODUCTION ENVIRONMENT** - This is the live production system (catv-ui).
 
+## Git Workflow
+- **main branch:** Production-ready code only. This branch is pulled to update the production environment.
+- **develop branch:** Development/testing branch in catv-ui-dev. New features are tested here.
+
+Deployment Steps:
+1. Wait for features to be tested in develop branch (catv-ui-dev)
+2. Pull main branch and deploy:
+   ```bash
+   cd /var/www/catv-ui
+   git pull origin main
+   npm run build
+   sudo systemctl restart catv-server
+   ```
+
 ## Overview
 A mobile-friendly CATV billing management system with a React + Vite frontend and a Node/Express backend backed by MariaDB via Prisma. The UI is Bengali-first with a left sidebar, topbar, and module pages. Authentication uses phone + password with JWT tokens stored in localStorage.
 
@@ -137,6 +151,47 @@ Backend:
 - If API requests return HTML ("Unexpected token <"), ensure API uses /api and Nginx proxies /api.
 - If server errors show DATABASE_URL missing, check server/.env for corruption and restart catv-server.
 - Do not commit server/.env (in .gitignore).
+
+## Production Deployment Workflow
+
+### When to Deploy
+- Always wait for features to be tested in develop branch (catv-ui-dev)
+- Each deploy should be a verified, tested build from main branch
+- Never push directly to production - always use git pull
+
+### Deployment Checklist
+1. Verify develop branch is stable in catv-ui-dev
+2. Pull latest main branch:
+   ```bash
+   cd /var/www/catv-ui
+   git pull origin main
+   ```
+3. Build frontend:
+   ```bash
+   npm run build
+   ```
+4. Test nginx config:
+   ```bash
+   sudo nginx -t
+   ```
+5. Reload nginx and restart backend:
+   ```bash
+   sudo systemctl reload nginx
+   sudo systemctl restart catv-server
+   ```
+6. Verify system is running:
+   ```bash
+   sudo systemctl status catv-server --no-pager
+   ```
+
+### Rollback (if needed)
+```bash
+cd /var/www/catv-ui
+git log --oneline -5       # Find previous stable commit
+git reset --hard <commit>  # Rollback to that commit
+npm run build
+sudo systemctl restart catv-server
+```
 
 ## Next Suggested Steps
 - Wire Customers and Billing modules to real APIs.
