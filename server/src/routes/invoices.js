@@ -131,11 +131,20 @@ router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
     const dueCurrent = Math.max(0, bill.amount - (allocationsByBill[bill.id] || 0))
     const advanceAmount = totalPaid > totalAmount ? totalPaid - totalAmount : 0
     const status = normalizeStatus(totalAmount, totalPaid)
-    const allocationMonths = lastPaymentAllocations.map((row) => ({
-      month: row.bill.periodMonth,
-      year: row.bill.periodYear,
-      label: monthLabel(row.bill.periodYear, row.bill.periodMonth),
-    }))
+    // For postpaid system, show previous month on invoice
+    const allocationMonths = lastPaymentAllocations.map((row) => {
+      let displayMonth = row.bill.periodMonth - 1
+      let displayYear = row.bill.periodYear
+      if (displayMonth < 1) {
+        displayMonth = 12
+        displayYear -= 1
+      }
+      return {
+        month: displayMonth,
+        year: displayYear,
+        label: monthLabel(displayYear, displayMonth),
+      }
+    })
 
     const company = await prisma.company.findFirst({
       where: { id: req.user.companyId },

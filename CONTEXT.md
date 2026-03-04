@@ -1,5 +1,8 @@
 # Zyrotech CATV Billing Management - Project Context
 
+## Environment
+**DEVELOPMENT ENVIRONMENT** - This is the development/testing system (catv-ui-dev).
+
 ## Overview
 A mobile-friendly CATV billing management system with a React + Vite frontend and a Node/Express backend backed by MariaDB via Prisma. The UI is Bengali-first with a left sidebar, topbar, and module pages. Authentication uses phone + password with JWT tokens stored in localStorage.
 
