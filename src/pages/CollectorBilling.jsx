@@ -176,6 +176,16 @@ const CustomerListItem = ({ customer, onMenuClick, selectedStatus }) => {
 
         <div className="customer-right-section">
           <div className="due-amount">{formatCurrency(customer.totalDue)}</div>
+          <div className="bill-info">
+            <div className="bill-item">
+              <span className="bill-label">মাসিক</span>
+              <span className="bill-value">{formatCurrency(customer.monthlyFee)}</span>
+            </div>
+            <div className="bill-item">
+              <span className="bill-label">পরিশোধ</span>
+              <span className="bill-value">{formatCurrency(customer.paidTotal)}</span>
+            </div>
+          </div>
           <div className="menu-anchor">
             <button
               ref={buttonRef}

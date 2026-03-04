@@ -472,7 +472,7 @@ function Billing() {
                     {statusLabel(row.status)}
                   </span>
                 </td>
-                <td>{formatCurrency(row.amount)}</td>
+                <td>{formatCurrency(row.monthlyFee)}</td>
                 <td>{formatCurrency(row.paidTotal)}</td>
                 <td>{formatCurrency(row.totalDue)}</td>
                 <td>
