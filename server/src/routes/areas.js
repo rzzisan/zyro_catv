@@ -6,11 +6,11 @@ import { requireAuth, requireRole } from '../lib/auth.js'
 const router = express.Router()
 
 const areaSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
 })
 
 const areaUpdateSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
 })
 
 router.get('/', requireAuth, async (req, res, next) => {
@@ -48,7 +48,7 @@ router.post('/', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res
     const area = await prisma.area.create({
       data: {
         companyId: req.user.companyId,
-        name: parsed.data.name.trim(),
+        name: parsed.data.name,
         createdById: req.user.userId,
       },
     })
@@ -79,7 +79,7 @@ router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req,
 
     const area = await prisma.area.update({
       where: { id: existing.id },
-      data: { name: parsed.data.name.trim() },
+      data: { name: parsed.data.name },
     })
 
     return res.json({ data: area })
