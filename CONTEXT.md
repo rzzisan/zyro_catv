@@ -13,6 +13,7 @@ A mobile-friendly CATV billing management system with a React + Vite frontend an
 - Modules implemented with listing + create for Areas, Managers, Collectors.
 - Other modules have placeholder UIs (Billing, Customers, Reports, Deposits, Expenses, Expense Categories, Employees, Tutorials).
 - Backend APIs for auth, areas, managers, collectors are live.
+- **Bill Receipt (বিল রিসিট):** New menu for printing invoices from payment history. Collectors see only their area's bills, Admins/Managers see all bills.
 - Nginx serves the SPA and proxies API requests.
 - Systemd service runs the backend API.
 - Sidebar supports collapse on desktop and off-canvas on mobile.
