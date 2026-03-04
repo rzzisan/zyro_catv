@@ -1761,6 +1761,53 @@ a {
   min-width: 80px;
 }
 
+.collection-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  min-width: 80px;
+}
+
+.collection-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f7a6a;
+  text-align: right;
+}
+
+.collection-label {
+  font-size: 0.7rem;
+  color: #6f6a64;
+  text-align: right;
+}
+
+.collection-count {
+  font-size: 0.72rem;
+  color: #a25241;
+  text-align: right;
+  font-weight: 600;
+}
+
+.bill-receipt-header {
+  padding: 1rem 0 0.8rem;
+  text-align: center;
+}
+
+.current-month-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 0.3rem;
+}
+
+.header-subtitle {
+  font-size: 0.85rem;
+  color: #6f6a64;
+  margin: 0;
+}
+
+
 
 .menu-button {
   width: 32px;

@@ -840,4 +840,112 @@ router.delete('/payments/:paymentId', requireAuth, requireRole(['ADMIN']), async
   }
 })
 
+// Get current month's payment receipts for printing
+router.get('/current-month-receipts', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
+  try {
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
+    
+    // Start and end of current month
+    const startOfMonth = new Date(currentYear, currentMonth - 1, 1)
+    const endOfMonth = new Date(currentYear, currentMonth, 1)
+    
+    // Base where clause for payments
+    let paymentWhere = {
+      paidAt: {
+        gte: startOfMonth,
+        lt: endOfMonth,
+      },
+      bill: {
+        companyId: req.user.companyId,
+      },
+    }
+    
+    // COLLECTOR can only see payments from their assigned areas
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      paymentWhere.bill.customer = { areaId: { in: areaIds } }
+    }
+    
+    // Fetch all payments in current month
+    const payments = await prisma.payment.findMany({
+      where: paymentWhere,
+      include: {
+        bill: {
+          select: {
+            id: true,
+            customerId: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                customerCode: true,
+                mobile: true,
+                address: true,
+                dueBalance: true,
+                area: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { paidAt: 'desc' },
+    })
+    
+    // Group payments by customer
+    const customerMap = {}
+    
+    for (const payment of payments) {
+      const customerId = payment.bill.customerId
+      const customer = payment.bill.customer
+      
+      if (!customerMap[customerId]) {
+        customerMap[customerId] = {
+          customerId,
+          name: customer.name,
+          customerCode: customer.customerCode,
+          mobile: customer.mobile,
+          address: customer.address,
+          totalDue: customer.dueBalance,
+          area: customer.area,
+          totalCollected: 0,
+          paymentCount: 0,
+          lastPaymentDate: payment.paidAt,
+          billId: payment.bill.id, // Latest bill ID for invoice printing
+        }
+      }
+      
+      customerMap[customerId].totalCollected += payment.amount
+      customerMap[customerId].paymentCount += 1
+      
+      // Update to most recent payment date and bill
+      if (new Date(payment.paidAt) > new Date(customerMap[customerId].lastPaymentDate)) {
+        customerMap[customerId].lastPaymentDate = payment.paidAt
+        customerMap[customerId].billId = payment.bill.id
+      }
+    }
+    
+    // Convert to array and sort by last payment date (most recent first)
+    const customers = Object.values(customerMap).sort((a, b) => 
+      new Date(b.lastPaymentDate) - new Date(a.lastPaymentDate)
+    )
+    
+    return res.json({
+      data: customers,
+      meta: {
+        total: customers.length,
+        month: currentMonth,
+        year: currentYear,
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
 export default router

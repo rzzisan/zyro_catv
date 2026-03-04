@@ -1,21 +1,17 @@
 # Zyrotech CATV Billing Management - Project Context
 
 ## Environment
-**PRODUCTION ENVIRONMENT** - This is the live production system (catv-ui).
+**DEVELOPMENT ENVIRONMENT** - This is the development/testing system (catv-ui-dev).
 
 ## Git Workflow
-- **main branch:** Production-ready code only. This branch is pulled to update the production environment.
-- **develop branch:** Development/testing branch in catv-ui-dev. New features are tested here.
+- **main branch:** Production-ready code only. Pull to production environment.
+- **develop branch:** Development/testing branch. All new features and fixes go here first.
 
-Deployment Steps:
-1. Wait for features to be tested in develop branch (catv-ui-dev)
-2. Pull main branch and deploy:
-   ```bash
-   cd /var/www/catv-ui
-   git pull origin main
-   npm run build
-   sudo systemctl restart catv-server
-   ```
+Workflow:
+1. Work on `develop` branch for all new features and fixes
+2. Test thoroughly in development environment (catv-ui-dev)
+3. Merge to `main` branch after approval
+4. Pull `main` to production environment (catv-ui) and deploy
 
 ## Overview
 A mobile-friendly CATV billing management system with a React + Vite frontend and a Node/Express backend backed by MariaDB via Prisma. The UI is Bengali-first with a left sidebar, topbar, and module pages. Authentication uses phone + password with JWT tokens stored in localStorage.
@@ -29,7 +25,7 @@ A mobile-friendly CATV billing management system with a React + Vite frontend an
 - Backend APIs for auth, areas, managers, collectors are live.
 - **Bill Receipt (বিল রিসিট):** New menu for printing invoices from payment history. Collectors see only their area's bills, Admins/Managers see all bills.
 - Nginx serves the SPA and proxies API requests.
-- Systemd service runs the backend API.
+- Systemd service runs the backend API (port 5001 for dev, 5000 for prod).
 - Sidebar supports collapse on desktop and off-canvas on mobile.
 
 ## Tech Stack
@@ -152,37 +148,56 @@ Backend:
 - If server errors show DATABASE_URL missing, check server/.env for corruption and restart catv-server.
 - Do not commit server/.env (in .gitignore).
 
-## Production Deployment Workflow
+## Git Workflow Details
 
-### When to Deploy
-- Always wait for features to be tested in develop branch (catv-ui-dev)
-- Each deploy should be a verified, tested build from main branch
-- Never push directly to production - always use git pull
+### Development Process
+1. Always work on `develop` branch:
+   ```bash
+   cd /var/www/catv-ui-dev
+   git checkout develop
+   git pull origin develop
+   ```
 
-### Deployment Checklist
-1. Verify develop branch is stable in catv-ui-dev
-2. Pull latest main branch:
+2. Make changes and test in development environment
+
+3. Commit with clear messages:
+   ```bash
+   git add .
+   git commit -m "feat: description of feature"
+   ```
+
+4. Push to develop branch:
+   ```bash
+   git push origin develop
+   ```
+
+### Promoting to Production
+1. When ready to deploy:
+   ```bash
+   cd /var/www/catv-ui-dev
+   git checkout main
+   git pull origin main
+   git merge develop
+   git push origin main
+   ```
+
+2. Then update production:
    ```bash
    cd /var/www/catv-ui
    git pull origin main
-   ```
-3. Build frontend:
-   ```bash
    npm run build
-   ```
-4. Test nginx config:
-   ```bash
-   sudo nginx -t
-   ```
-5. Reload nginx and restart backend:
-   ```bash
-   sudo systemctl reload nginx
+   sudo nginx -t && sudo systemctl reload nginx
    sudo systemctl restart catv-server
    ```
-6. Verify system is running:
-   ```bash
-   sudo systemctl status catv-server --no-pager
-   ```
+
+### Production Deployment Checklist
+1. Verify develop branch is stable in catv-ui-dev
+2. Merge develop to main (as shown above)
+3. Pull latest main in production
+4. Build frontend: `npm run build`
+5. Test nginx: `sudo nginx -t`
+6. Restart services: `sudo systemctl reload nginx && sudo systemctl restart catv-server`
+7. Verify: `sudo systemctl status catv-server --no-pager`
 
 ### Rollback (if needed)
 ```bash
@@ -192,6 +207,11 @@ git reset --hard <commit>  # Rollback to that commit
 npm run build
 sudo systemctl restart catv-server
 ```
+
+### Branch Protection
+- `main` branch is for production code only
+- Always test in `develop` before merging to `main`
+- Use pull requests for code review (recommended)
 
 ## Next Suggested Steps
 - Wire Customers and Billing modules to real APIs.
