@@ -90,12 +90,14 @@ function InvoicePrint() {
         <div className="line"><span className="muted">তারিখ</span><span>{formatDateTime(lastPayment?.paidAt || new Date())}</span></div>
         <div className="line"><span className="muted">পরিশোধের মাস</span><span>{formatMonths(allocationMonths)}</span></div>
         <div className="line"><span className="muted">গ্রাহক</span><span>{customer?.name}</span></div>
+        <div className="line"><span className="muted">মোবাইল</span><span>{customer?.mobile || '-'}</span></div>
         <div className="line"><span className="muted">আইডি</span><span>{customer?.customerCode}</span></div>
-        <div className="line"><span className="muted">এরিয়া</span><span>{customer?.area?.name || '-'}</span></div>
+        <div className="line"><span className="muted">এরিয়া</span><span>{customer?.area?.name || '-'}</span></div>
         <div className="divider" />
+        <div className="line"><span className="muted">বকেয়া</span><span>{formatCurrency(data.totalDue + data.paidTotal)}</span></div>
         <div className="line"><span className="muted">মাসিক বিল</span><span>{formatCurrency(bill?.amount)}</span></div>
         <div className="line"><span className="muted">পরিশোধ</span><span>{formatCurrency(data.paidTotal)}</span></div>
-        <div className="line"><span className="muted">বকেয়া</span><span>{formatCurrency(data.totalDue)}</span></div>
+        <div className="line"><span className="muted">অবশিষ্ট</span><span>{formatCurrency(data.totalDue)}</span></div>
         <div className="divider" />
         <div className="line total"><span>স্ট্যাটাস</span><span>{bill?.status}</span></div>
         <div className="line"><span className="muted">মেথড</span><span>{lastPayment?.method || '-'}</span></div>
