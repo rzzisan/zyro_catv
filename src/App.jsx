@@ -33,6 +33,7 @@ import AdminSettings from './pages/AdminSettings.jsx'
 import AdminSupportTickets from './pages/AdminSupportTickets.jsx'
 import AdminBackups from './pages/AdminBackups.jsx'
 import AdminAnalytics from './pages/AdminAnalytics.jsx'
+import BillReceipt from './pages/BillReceipt.jsx'
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
         <Route path="/company-settings" element={<CompanySettings />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/collector-billing" element={<CollectorBilling />} />
+        <Route path="/bill-receipt" element={<BillReceipt />} />
         <Route path="/reports" element={<Navigate to="/reports/current-month" replace />} />
         <Route path="/reports/current-month" element={<Reports />} />
         <Route path="/reports/all-months" element={<ReportsAllMonths />} />

@@ -27,6 +27,7 @@ const modules = [
   { label: 'গ্রাহক', to: '/customers', icon: 'user' },
   { label: 'বিল', to: '/billing', icon: 'receipt' },
   { label: 'বিল সংগ্রহ', to: '/collector-billing', icon: 'banknote' },
+  { label: 'বিল রিসিট', to: '/bill-receipt', icon: 'print-receipt' },
   { label: '__REPORT_GROUP__' },
   { label: 'ডিপোজিট', to: '/deposits', icon: 'banknote' },
   { label: 'কোম্পানি সেটিং', to: '/company-settings', icon: 'gear' },
@@ -260,6 +261,17 @@ const Icon = ({ name }) => {
           <path d="M9 19V9" />
           <path d="M14 19V12" />
           <path d="M19 19V7" />
+        </svg>
+      )
+    case 'print-receipt':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <rect x="3" y="5" width="18" height="12" rx="2" />
+          <path d="M3 17h18" />
+          <path d="M5 20h14" />
+          <path d="M8 8h8" />
+          <path d="M8 11h8" />
+          <path d="M8 14h5" />
         </svg>
       )
     default:

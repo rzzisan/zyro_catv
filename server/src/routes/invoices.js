@@ -31,6 +31,77 @@ const monthLabel = (year, month) => {
   return `${name} ${year}`
 }
 
+// Get bills list for printing receipts/invoices
+router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1
+    const limit = parseInt(req.query.limit) || 20
+    const skip = (page - 1) * limit
+    
+    let where = { companyId: req.user.companyId }
+    
+    // COLLECTOR can only see bills from their assigned areas
+    if (req.user.role === 'COLLECTOR') {
+      const assignments = await prisma.collectorArea.findMany({
+        where: { collectorId: req.user.userId, area: { companyId: req.user.companyId } },
+        select: { areaId: true },
+      })
+      const areaIds = assignments.map((item) => item.areaId)
+      where.customer = { area: { id: { in: areaIds } } }
+    }
+    
+    const [total, bills] = await Promise.all([
+      prisma.bill.count({ where }),
+      prisma.bill.findMany({
+        where,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              customerCode: true,
+              mobile: true,
+              area: { select: { id: true, name: true } },
+            },
+          },
+          payments: {
+            select: { amount: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ])
+
+    const billsList = bills.map((bill) => {
+      const totalPaid = bill.payments.reduce((sum, p) => sum + p.amount, 0)
+      const status = normalizeStatus(bill.amount, totalPaid)
+      return {
+        id: bill.id,
+        customerName: bill.customer.name,
+        customerCode: bill.customer.customerCode,
+        customerMobile: bill.customer.mobile,
+        areaName: bill.customer.area.name,
+        periodMonth: bill.periodMonth,
+        periodYear: bill.periodYear,
+        monthLabel: monthLabel(bill.periodYear, bill.periodMonth),
+        amount: bill.amount,
+        totalPaid,
+        status,
+        createdAt: bill.createdAt,
+      }
+    })
+
+    return res.json({
+      data: billsList,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
 router.get('/:billId', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
     const bill = await prisma.bill.findFirst({
