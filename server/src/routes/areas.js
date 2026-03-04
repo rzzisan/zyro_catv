@@ -6,11 +6,11 @@ import { requireAuth, requireRole } from '../lib/auth.js'
 const router = express.Router()
 
 const areaSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: z.string().min(1).max(120),
 })
 
 const areaUpdateSchema = z.object({
-  name: z.string().min(2).max(120),
+  name: z.string().min(1).max(120),
 })
 
 router.get('/', requireAuth, async (req, res, next) => {
