@@ -136,6 +136,16 @@ function Dashboard() {
     [summary.pendingAmount, summary.pendingCount]
   )
 
+  const topBalanceLabel = role === 'MANAGER'
+    ? 'কালেক্টরদের অনুমোদিত ডিপোজিট'
+    : role === 'ADMIN'
+      ? 'চলতি মাসে মোট কালেকশন'
+      : 'ব্যালেন্স'
+
+  const topBalanceValue = role === 'COLLECTOR'
+    ? summary.balance
+    : summary.topBalance
+
   if (role === 'COLLECTOR') {
     return (
       <AppLayout title="ড্যাশবোর্ড" subtitle="কালেক্টর সারসংক্ষেপ">
@@ -211,7 +221,7 @@ function Dashboard() {
 
   return (
     <AppLayout title="ড্যাশবোর্ড" subtitle="আজকের সারসংক্ষেপ">
-      <section className="balance-banner">ব্যালেন্স: ৳ 0</section>
+      <section className="balance-banner">{topBalanceLabel}: {formatCurrency(topBalanceValue)}</section>
 
       <section className="stat-grid">
         {statCards.map((item) => (
