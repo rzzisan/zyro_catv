@@ -28,8 +28,12 @@ const endOfDay = (date) => {
 
 router.get('/summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    monthEnd.setHours(23, 59, 59, 999)
+
     if (req.user.role === 'COLLECTOR') {
-      const now = new Date()
       const [paymentsSum, approvedSum, pendingSum, todaySum, todayCount] = await Promise.all([
         prisma.payment.aggregate({
           where: {
@@ -80,13 +84,14 @@ router.get('/summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
           approvedTotal,
           pendingTotal,
           balance,
+          topBalance: balance,
           todayAmount: todaySum._sum.amount || 0,
           todayCount,
         },
       })
     }
 
-    const [pendingSum, pendingCount] = await Promise.all([
+    const [pendingSum, pendingCount, approvedByManagerSum, monthCollectedSum] = await Promise.all([
       prisma.deposit.aggregate({
         where: { companyId: req.user.companyId, status: 'PENDING' },
         _sum: { amount: true },
@@ -94,12 +99,33 @@ router.get('/summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR'
       prisma.deposit.count({
         where: { companyId: req.user.companyId, status: 'PENDING' },
       }),
+      prisma.deposit.aggregate({
+        where: {
+          companyId: req.user.companyId,
+          status: 'APPROVED',
+          approvedById: req.user.role === 'MANAGER' ? req.user.userId : undefined,
+        },
+        _sum: { amount: true },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          bill: { companyId: req.user.companyId },
+          paidAt: { gte: monthStart, lte: monthEnd },
+        },
+        _sum: { amount: true },
+      }),
     ])
+
+    const managerApprovedDepositAmount = approvedByManagerSum._sum.amount || 0
+    const adminMonthCollectedAmount = monthCollectedSum._sum.amount || 0
 
     return res.json({
       data: {
         pendingAmount: pendingSum._sum.amount || 0,
         pendingCount,
+        managerApprovedDepositAmount,
+        adminMonthCollectedAmount,
+        topBalance: req.user.role === 'MANAGER' ? managerApprovedDepositAmount : adminMonthCollectedAmount,
       },
     })
   } catch (error) {
