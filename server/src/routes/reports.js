@@ -229,21 +229,26 @@ router.get('/collection-summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 
       })
     }
 
-    // Sort by name
-    summaryData.sort((a, b) => a.name.localeCompare(b.name))
+    // Filter: শুধুমাত্র যারা এই মাসে কালেকশন করেছে (মাসিক কালেকশন count > 0 এবং amount > 0)
+    const filteredData = summaryData.filter(
+      (item) => item.thisMonth.count > 0 && item.thisMonth.amount > 0
+    )
 
-    // Calculate totals
+    // Sort by name
+    filteredData.sort((a, b) => a.name.localeCompare(b.name))
+
+    // Calculate totals from filtered data
     const totals = {
-      todayCount: summaryData.reduce((sum, item) => sum + item.today.count, 0),
-      todayAmount: summaryData.reduce((sum, item) => sum + item.today.amount, 0),
-      monthCount: summaryData.reduce((sum, item) => sum + item.thisMonth.count, 0),
-      monthAmount: summaryData.reduce((sum, item) => sum + item.thisMonth.amount, 0),
-      totalDeposit: summaryData.reduce((sum, item) => sum + item.deposit, 0),
-      totalBalance: summaryData.reduce((sum, item) => sum + item.balance, 0),
+      todayCount: filteredData.reduce((sum, item) => sum + item.today.count, 0),
+      todayAmount: filteredData.reduce((sum, item) => sum + item.today.amount, 0),
+      monthCount: filteredData.reduce((sum, item) => sum + item.thisMonth.count, 0),
+      monthAmount: filteredData.reduce((sum, item) => sum + item.thisMonth.amount, 0),
+      totalDeposit: filteredData.reduce((sum, item) => sum + item.deposit, 0),
+      totalBalance: filteredData.reduce((sum, item) => sum + item.balance, 0),
     }
 
     res.json({
-      data: summaryData,
+      data: filteredData,
       totals: totals,
       today: {
         date: today.toISOString().split('T')[0],
