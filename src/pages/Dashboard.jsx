@@ -49,6 +49,8 @@ function Dashboard() {
     amount: '',
     depositedAt: formatDateInput(new Date()),
   })
+  const [collectionSummary, setCollectionSummary] = useState([])
+  const [collectionTotals, setCollectionTotals] = useState({})
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -74,9 +76,27 @@ function Dashboard() {
     }
   }
 
+  const loadCollectionSummary = async () => {
+    if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
+    try {
+      const response = await fetch(`${apiBase}/reports/collection-summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'কালেকশন সামারি লোড করা যায়নি')
+      }
+      setCollectionSummary(data.data || [])
+      setCollectionTotals(data.totals || {})
+    } catch (error) {
+      console.error('Collection summary error:', error)
+    }
+  }
+
   useEffect(() => {
     loadSummary()
-  }, [])
+    loadCollectionSummary()
+  }, [token, role])
 
   const handleDepositSubmit = async (event) => {
     event.preventDefault()
@@ -221,6 +241,115 @@ function Dashboard() {
           </article>
         ))}
       </section>
+
+      {['ADMIN', 'MANAGER'].includes(role) && (
+        <section className="module-card">
+          <div className="module-header">
+            <div>
+              <div className="module-title">কালেকশন সারসংক্ষেপ</div>
+              <div className="module-sub">সকল কালেক্টর, ম্যানেজার এবং অ্যাডমিনের দৈনিক ও মাসিক কালেকশন</div>
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontSize: '0.875rem',
+            }}>
+              <thead>
+                <tr style={{
+                  backgroundColor: '#f3f4f6',
+                  borderBottom: '1px solid #e5e7eb',
+                }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '700' }}>নাম</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700' }}>আজ (বিল/টাকা)</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700' }}>কালেকশন (বিল/টাকা)</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700' }}>ডিপোজিট</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '700' }}>ব্যালেন্স</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collectionSummary.length > 0 ? (
+                  <>
+                    {collectionSummary.map((item) => (
+                      <tr key={item.id} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        '&:hover': { backgroundColor: '#f9fafb' },
+                      }}>
+                        <td style={{ padding: '0.75rem', textAlign: 'left' }}>
+                          <div style={{ fontWeight: '500' }}>{item.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{item.role}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <div>{item.today.count}</div>
+                          <div style={{ color: '#059669', fontWeight: '500' }}>
+                            ৳ {(item.today.amount || 0).toLocaleString('bn-BD')}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <div>{item.thisMonth.count}</div>
+                          <div style={{ color: '#2563eb', fontWeight: '500' }}>
+                            ৳ {(item.thisMonth.amount || 0).toLocaleString('bn-BD')}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <div style={{ color: '#7c3aed', fontWeight: '500' }}>
+                            ৳ {(item.deposit || 0).toLocaleString('bn-BD')}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <div style={{
+                            fontWeight: '500',
+                            color: item.balance >= 0 ? '#059669' : '#dc2626',
+                          }}>
+                            ৳ {(item.balance || 0).toLocaleString('bn-BD')}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{
+                      backgroundColor: '#f3f4f6',
+                      fontWeight: '700',
+                      borderTop: '2px solid #d1d5db',
+                    }}>
+                      <td style={{ padding: '0.75rem', textAlign: 'left' }}>মোট</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        <div>{collectionTotals.todayCount || 0}</div>
+                        <div style={{ color: '#059669' }}>
+                          ৳ {(collectionTotals.todayAmount || 0).toLocaleString('bn-BD')}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        <div>{collectionTotals.monthCount || 0}</div>
+                        <div style={{ color: '#2563eb' }}>
+                          ৳ {(collectionTotals.monthAmount || 0).toLocaleString('bn-BD')}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        <div style={{ color: '#7c3aed' }}>
+                          ৳ {(collectionTotals.totalDeposit || 0).toLocaleString('bn-BD')}
+                        </div>
+                      </td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                        <div style={{ color: collectionTotals.totalBalance >= 0 ? '#059669' : '#dc2626' }}>
+                          ৳ {(collectionTotals.totalBalance || 0).toLocaleString('bn-BD')}
+                        </div>
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: '#6b7280' }}>
+                      কোন ডেটা পাওয়া যায়নি
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </AppLayout>
   )
 }

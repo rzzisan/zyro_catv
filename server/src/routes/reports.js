@@ -136,4 +136,123 @@ router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLEC
   }
 })
 
+/**
+ * GET /api/reports/collection-summary
+ * কালেকশন সামারি - সকল কালেক্টর, ম্যানেজার, অ্যাডমিনের দৈনিক এবং মাসিক কালেকশন
+ */
+router.get('/collection-summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 'SUPER_ADMIN']), async (req, res, next) => {
+  try {
+    const companyId = req.user.companyId
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayEnd = new Date(today)
+    todayEnd.setHours(23, 59, 59, 999)
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    monthEnd.setHours(23, 59, 59, 999)
+
+    // সব ইউজার যারা কালেকশন করেছে (ADMIN, MANAGER, COLLECTOR)
+    const users = await prisma.user.findMany({
+      where: {
+        companyId: companyId,
+        role: { in: ['ADMIN', 'MANAGER', 'COLLECTOR'] },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        mobile: true,
+      },
+    })
+
+    const summaryData = []
+
+    for (const user of users) {
+      // আজকের কালেকশন
+      const todayPayments = await prisma.payment.findMany({
+        where: {
+          collectedById: user.id,
+          paidAt: {
+            gte: today,
+            lte: todayEnd,
+          },
+        },
+      })
+
+      const todayAmount = todayPayments.reduce((sum, p) => sum + p.amount, 0)
+      const todayCount = todayPayments.length
+
+      // এই মাসের কালেকশন
+      const monthPayments = await prisma.payment.findMany({
+        where: {
+          collectedById: user.id,
+          paidAt: {
+            gte: monthStart,
+            lte: monthEnd,
+          },
+        },
+      })
+
+      const monthAmount = monthPayments.reduce((sum, p) => sum + p.amount, 0)
+      const monthCount = monthPayments.length
+
+      // ডিপোজিট
+      const deposits = await prisma.deposit.findMany({
+        where: {
+          collectorId: user.id,
+          status: 'APPROVED',
+        },
+      })
+
+      const totalDeposit = deposits.reduce((sum, d) => sum + d.amount, 0)
+
+      // ব্যালেন্স (কালেকশন করেছে - ডিপোজিট করেছে)
+      const balance = todayAmount + (monthAmount - todayAmount) - totalDeposit
+
+      summaryData.push({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        mobile: user.mobile,
+        today: {
+          count: todayCount,
+          amount: todayAmount,
+        },
+        thisMonth: {
+          count: monthCount,
+          amount: monthAmount,
+        },
+        deposit: totalDeposit,
+        balance: balance,
+      })
+    }
+
+    // Sort by name
+    summaryData.sort((a, b) => a.name.localeCompare(b.name))
+
+    // Calculate totals
+    const totals = {
+      todayCount: summaryData.reduce((sum, item) => sum + item.today.count, 0),
+      todayAmount: summaryData.reduce((sum, item) => sum + item.today.amount, 0),
+      monthCount: summaryData.reduce((sum, item) => sum + item.thisMonth.count, 0),
+      monthAmount: summaryData.reduce((sum, item) => sum + item.thisMonth.amount, 0),
+      totalDeposit: summaryData.reduce((sum, item) => sum + item.deposit, 0),
+      totalBalance: summaryData.reduce((sum, item) => sum + item.balance, 0),
+    }
+
+    res.json({
+      data: summaryData,
+      totals: totals,
+      today: {
+        date: today.toISOString().split('T')[0],
+      },
+    })
+  } catch (error) {
+    console.error('Collection summary error:', error)
+    return next(error)
+  }
+})
+
 export default router
