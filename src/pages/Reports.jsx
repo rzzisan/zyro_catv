@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -11,7 +11,78 @@ const formatDateInput = (value) => {
   return date.toISOString().slice(0, 10)
 }
 
-const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
+const formatCurrency = (value) => `৳${Number(value || 0).toLocaleString('bn-BD')}`
+
+const getInitial = (name = '') => {
+  const trimmed = String(name).trim()
+  return trimmed ? trimmed[0] : 'ক'
+}
+
+const avatarPalette = ['#f5b55e', '#66a7e6', '#7dc8a7', '#f08ab5', '#b28ce2']
+
+const getAvatarColor = (seed) => {
+  const text = String(seed ?? '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 997
+  }
+  return avatarPalette[Math.abs(hash) % avatarPalette.length]
+}
+
+// Collector Report Card Component
+const CollectorReportCard = ({ collector }) => {
+  return (
+    <div className="report-card">
+      <div
+        className="report-avatar"
+        aria-hidden="true"
+        style={{ background: getAvatarColor(collector.collectorId || collector.collectorName) }}
+      >
+        <span>{getInitial(collector.collectorName)}</span>
+      </div>
+
+      <div className="report-main-info">
+        <h4 className="report-name">{collector.collectorName}</h4>
+        <span className="report-subtitle">{collector.totalCount} টি বিল সংগ্রহ</span>
+      </div>
+
+      <div className="report-right-section">
+        <div className="report-amount">{formatCurrency(collector.totalAmount)}</div>
+        <div className="report-label">মোট কালেকশন</div>
+      </div>
+    </div>
+  )
+}
+
+// Detail Report Card Component
+const DetailReportCard = ({ detail }) => {
+  return (
+    <div className="detail-card">
+      <div className="detail-main">
+        <div className="detail-customer">
+          <span className="detail-name">
+            {detail.customer ? `${detail.customer.name} (${detail.customer.customerCode})` : '—'}
+          </span>
+          <span className="detail-mobile">{detail.customer?.mobile || '—'}</span>
+        </div>
+      </div>
+      <div className="detail-info">
+        <div className="detail-item">
+          <span className="detail-label">তারিখ</span>
+          <span className="detail-value">{formatDateInput(detail.paidAt)}</span>
+        </div>
+        <div className="detail-item">
+          <span className="detail-label">মেথড</span>
+          <span className="detail-value">{detail.method || '—'}</span>
+        </div>
+        <div className="detail-item">
+          <span className="detail-label">পরিমাণ</span>
+          <span className="detail-value amount">{formatCurrency(detail.amount)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const getUserRole = () => {
   const token = localStorage.getItem('auth_token')
@@ -113,14 +184,15 @@ function Reports() {
 
   return (
     <AppLayout title="রিপোর্ট" subtitle="বর্তমান মাসের বিল কালেকশন রিপোর্ট">
-      <div className="module-card">
-        <div className="module-header">
+      <div className="reports-container">
+        <div className="reports-header">
           <div>
             <div className="module-title">কালেকশন রিপোর্ট</div>
-            <div className="module-sub">ডিফল্টভাবে চলতি মাসের কালেকশন দেখায়</div>
+            <div className="module-sub">ডিফল্টভাবে চলতি মাসের কালেকশন দেখায়</div>
           </div>
         </div>
-        <div className="metric-row">
+
+        <div className="reports-summary">
           <div className="metric-card">
             <div className="metric-value">{summary.totalCollectors}</div>
             <div className="metric-label">মোট কালেক্টর</div>
@@ -134,7 +206,8 @@ function Reports() {
             <div className="metric-label">মোট কালেকশন</div>
           </div>
         </div>
-        <div className="filter-grid">
+
+        <div className="reports-filters">
           <label className="filter-item">
             <span>রিপোর্ট টাইপ</span>
             <select
@@ -212,54 +285,39 @@ function Reports() {
             </label>
           )}
         </div>
-        {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>কালেক্টর</th>
-              <th>বিল সংখ্যা</th>
-              <th>মোট কালেকশন</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.collectorId || row.collectorName}>
-                <td>{row.collectorName}</td>
-                <td>{row.totalCount}</td>
-                <td>{formatCurrency(row.totalAmount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {role === 'COLLECTOR' ? (
-          <div className="module-card detail-card">
-            <div className="module-title">দৈনিক বিস্তারিত রিপোর্ট</div>
-            <div className="module-sub">বিল সংগ্রহ করা গ্রাহকের তালিকা</div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>গ্রাহক</th>
-                  <th>মোবাইল</th>
-                  <th>তারিখ</th>
-                  <th>মেথড</th>
-                  <th>পরিমাণ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detailRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.customer ? `${row.customer.name} (${row.customer.customerCode})` : '—'}</td>
-                    <td>{row.customer?.mobile || '—'}</td>
-                    <td>{formatDateInput(row.paidAt)}</td>
-                    <td>{row.method || '—'}</td>
-                    <td>{formatCurrency(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+        <div className="reports-content">
+          {isLoading && <div className="loading-message">লোড হচ্ছে...</div>}
+
+          {!isLoading && rows.length === 0 && (
+            <div className="empty-message">
+              <p>কোন রিপোর্ট পাওয়া যায়নি</p>
+            </div>
+          )}
+
+          {!isLoading && rows.length > 0 && (
+            <div className="reports-list">
+              {rows.map((row) => (
+                <CollectorReportCard key={row.collectorId || row.collectorName} collector={row} />
+              ))}
+            </div>
+          )}
+        </div>
+        {role === 'COLLECTOR' && detailRows.length > 0 && (
+          <div className="reports-details">
+            <div className="reports-details-header">
+              <div className="module-title">দৈনিক বিস্তারিত রিপোর্ট</div>
+              <div className="module-sub">বিল সংগ্রহ করা গ্রাহকের তালিকা</div>
+            </div>
+            <div className="details-list">
+              {detailRows.map((row) => (
+                <DetailReportCard key={row.id} detail={row} />
+              ))}
+            </div>
           </div>
-        ) : null}
-        {status ? <div className="status-banner error">{status}</div> : null}
+        )}
+
+        {status && <div className="status-banner error">{status}</div>}
       </div>
     </AppLayout>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -23,7 +23,50 @@ const formatDateTime = (value) => {
   })
 }
 
-const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
+const formatCurrency = (value) => `৳${Number(value || 0).toLocaleString('bn-BD')}`
+
+const getInitial = (name = '') => {
+  const trimmed = String(name).trim()
+  return trimmed ? trimmed[0] : 'ক'
+}
+
+const avatarPalette = ['#f5b55e', '#66a7e6', '#7dc8a7', '#f08ab5', '#b28ce2']
+
+const getAvatarColor = (seed) => {
+  const text = String(seed ?? '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 997
+  }
+  return avatarPalette[Math.abs(hash) % avatarPalette.length]
+}
+
+// Collector Report Card Component
+const CollectorReportCard = ({ collector }) => {
+  return (
+    <div className="report-card">
+      <div
+        className="report-avatar"
+        aria-hidden="true"
+        style={{ background: getAvatarColor(collector.collectorId || collector.collectorName) }}
+      >
+        <span>{getInitial(collector.collectorName)}</span>
+      </div>
+
+      <div className="report-main-info">
+        <h4 className="report-name">{collector.collectorName}</h4>
+        <span className="report-subtitle">{collector.totalCount} টি বিল সংগ্রহ</span>
+      </div>
+
+      <div className="report-right-section">
+        <div className="report-amount">{formatCurrency(collector.totalAmount)}</div>
+        <div className="report-label">মোট আদায়</div>
+      </div>
+    </div>
+  )
+}
+
+// Detail Report Card Component (REMOVED - Using Table Instead)
 
 const monthLabels = [
   'জানুয়ারি',
@@ -138,14 +181,15 @@ function ReportsAllMonths() {
 
   return (
     <AppLayout title="রিপোর্ট" subtitle="সকল মাসের বিল কালেকশন">
-      <div className="module-card">
-        <div className="module-header">
+      <div className="reports-container">
+        <div className="reports-header">
           <div>
             <div className="module-title">সকল মাসের কালেকশন রিপোর্ট</div>
-            <div className="module-sub">মাস ও কালেক্টর অনুযায়ী বিল কালেকশন দেখুন</div>
+            <div className="module-sub">মাস ও কালেক্টর অনুযায়ী বিল কালেকশন দেখুন</div>
           </div>
         </div>
-        <div className="metric-row">
+
+        <div className="reports-summary">
           <div className="metric-card">
             <div className="metric-value">{summary.totalCollectors}</div>
             <div className="metric-label">মোট কালেক্টর</div>
@@ -159,7 +203,8 @@ function ReportsAllMonths() {
             <div className="metric-label">মোট আদায়</div>
           </div>
         </div>
-        <div className="filter-grid">
+
+        <div className="reports-filters">
           <label className="filter-item">
             <span>মাস</span>
             <select
@@ -202,61 +247,65 @@ function ReportsAllMonths() {
             </label>
           )}
         </div>
-        {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>কালেক্টর</th>
-              <th>বিল সংখ্যা</th>
-              <th>মোট আদায়</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.collectorId || row.collectorName}>
-                <td>{row.collectorName}</td>
-                <td>{row.totalCount}</td>
-                <td>{formatCurrency(row.totalAmount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="module-card detail-card">
-          <div className="module-title">গ্রাহক তালিকা</div>
-          <div className="module-sub">বকেয়া তারিখ ও কালেকশন সময়সহ বিস্তারিত তালিকা</div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>কালেক্টর</th>
-                <th>গ্রাহক</th>
-                <th>মোবাইল</th>
-                <th>বকেয়া তারিখ/সময়</th>
-                <th>কালেকশন সময়</th>
-                <th>আদায়</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detailRows.map((row) => {
-                const periodMonth = row.bill?.periodMonth
-                const periodYear = row.bill?.periodYear
-                const dueDate = resolveDueDate(periodMonth, periodYear)
-                return (
-                  <tr key={row.id}>
-                    <td>{row.collector?.name || '—'}</td>
-                    <td>
-                      {row.customer ? `${row.customer.name} (${row.customer.customerCode})` : '—'}
-                    </td>
-                    <td>{row.customer?.mobile || '—'}</td>
-                    <td>{dueDate ? formatDateTime(dueDate) : '—'}</td>
-                    <td>{formatDateTime(row.paidAt)}</td>
-                    <td>{formatCurrency(row.amount)}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+
+        <div className="reports-content">
+          {isLoading && <div className="loading-message">লোড হচ্ছে...</div>}
+
+          {!isLoading && rows.length === 0 && (
+            <div className="empty-message">
+              <p>কোন রিপোর্ট পাওয়া যায়নি</p>
+            </div>
+          )}
+
+          {!isLoading && rows.length > 0 && (
+            <div className="reports-list">
+              {rows.map((row) => (
+                <CollectorReportCard key={row.collectorId || row.collectorName} collector={row} />
+              ))}
+            </div>
+          )}
         </div>
-        {status ? <div className="status-banner error">{status}</div> : null}
+
+        {detailRows.length > 0 && (
+          <div className="reports-details">
+            <div className="reports-details-header">
+              <div className="module-title">গ্রাহক তালিকা</div>
+              <div className="module-sub">বকেয়া তারিখ ও কালেকশন সময়সহ বিস্তারিত তালিকা</div>
+            </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ক্রম</th>
+                  <th>কালেক্টর</th>
+                  <th>গ্রাহক</th>
+                  <th>মোবাইল</th>
+                  <th>কালেকশন সময়</th>
+                  <th>আদায়</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailRows.map((row, index) => {
+                  const periodMonth = row.bill?.periodMonth
+                  const periodYear = row.bill?.periodYear
+                  return (
+                    <tr key={row.id}>
+                      <td>{index + 1}</td>
+                      <td>{row.collector?.name || '—'}</td>
+                      <td>
+                        {row.customer ? `${row.customer.name} (${row.customer.customerCode})` : '—'}
+                      </td>
+                      <td>{row.customer?.mobile || '—'}</td>
+                      <td>{formatDateTime(row.paidAt)}</td>
+                      <td>{formatCurrency(row.amount)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {status && <div className="status-banner error">{status}</div>}
       </div>
     </AppLayout>
   )

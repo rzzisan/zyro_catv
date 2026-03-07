@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout.jsx'
 
@@ -26,6 +26,149 @@ const statusLabel = (value) => {
   return match ? match.label : value
 }
 
+const formatCurrency = (value) => `৳${Number(value || 0).toLocaleString('bn-BD')}`
+
+const getInitial = (name = '') => {
+  const trimmed = String(name).trim()
+  return trimmed ? trimmed[0] : 'গ'
+}
+
+const avatarPalette = ['#f5b55e', '#66a7e6', '#7dc8a7', '#f08ab5', '#b28ce2']
+
+const getAvatarColor = (seed) => {
+  const text = String(seed ?? '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 997
+  }
+  return avatarPalette[Math.abs(hash) % avatarPalette.length]
+}
+
+// Menu Dialog Component
+const BillMenuDialog = ({ bill, onClose, onCollect, onHistory, onPrint, menuRef }) => {
+  return (
+    <div className="menu-popover" ref={menuRef}>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onCollect(bill)
+          onClose()
+        }}
+        title="বিল কালেকশন"
+      >
+        কালেক্ট
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onHistory(bill)
+          onClose()
+        }}
+        title="বিল হিস্টোরি"
+      >
+        হিস্টোরি
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onPrint(bill)
+          onClose()
+        }}
+        title="ইনভয়েস প্রিন্ট"
+      >
+        ইনভয়েস
+      </button>
+    </div>
+  )
+}
+
+// Bill List Item Component
+const BillListItem = ({ bill, onMenuClick }) => {
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef(null)
+  const buttonRef = useRef(null)
+
+  useEffect(() => {
+    if (!showMenu) return undefined
+    const handleClickOutside = (event) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
+  return (
+    <>
+      <div className={`bill-row ${showMenu ? 'menu-open' : ''}`}>
+        <div
+          className="bill-avatar"
+          aria-hidden="true"
+          style={{ background: getAvatarColor(bill.customerId || bill.billId) }}
+        >
+          <span>{getInitial(bill.name)}</span>
+        </div>
+
+        <div className="bill-main-info">
+          <h4 className="bill-name">{bill.name}</h4>
+          <span className="bill-id">{bill.customerCode}</span>
+          <div className="bill-contact-info">
+            <div className="contact-line">{bill.area?.name || '—'}</div>
+            <div className="contact-line">{bill.mobile || '—'}</div>
+          </div>
+        </div>
+
+        <div className="bill-right-section">
+          <div className="bill-amounts">
+            <div className="amount-item">
+              <span className="amount-label">স্ট্যাটাস</span>
+              <span className={`status-pill ${bill.status.toLowerCase()}`}>
+                {statusLabel(bill.status)}
+              </span>
+            </div>
+          </div>
+          <div className="bill-values">
+            <div className="value-item">
+              <span className="value-label">মাসিক</span>
+              <span className="value-amount">{formatCurrency(bill.monthlyFee)}</span>
+            </div>
+            <div className="value-item">
+              <span className="value-label">বকেয়া</span>
+              <span className="value-amount due">{formatCurrency(bill.totalDue)}</span>
+            </div>
+          </div>
+          <div className="menu-anchor">
+            <button
+              ref={buttonRef}
+              className="menu-button"
+              onClick={() => setShowMenu((prev) => !prev)}
+              title="অপশন"
+            >
+              ⋮
+            </button>
+            {showMenu && (
+              <BillMenuDialog
+                bill={bill}
+                onClose={() => setShowMenu(false)}
+                onCollect={onMenuClick.onCollect}
+                onHistory={onMenuClick.onHistory}
+                onPrint={onMenuClick.onPrint}
+                menuRef={menuRef}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 const formatDateTimeValue = (value) => {
   if (!value) return ''
   const date = new Date(value)
@@ -38,8 +181,6 @@ const formatDateTimeValue = (value) => {
   const minutes = pad(date.getMinutes())
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
-
-const formatCurrency = (value) => `৳ ${Number(value || 0).toLocaleString('bn-BD')}`
 
 const formatMonthAllocations = (items = []) => {
   if (!items.length) return '—'
@@ -346,18 +487,71 @@ function Billing() {
     window.open(`/invoice/${row.billId}`, '_blank', 'noopener')
   }
 
+  const menuHandlers = {
+    onCollect: openCollectModal,
+    onHistory: openHistoryModal,
+    onPrint: handlePrint,
+  }
+
   return (
     <AppLayout title="বিল" subtitle="বিলিং ও কালেকশন তালিকা">
-      <div className="module-card">
-        <div className="module-header">
-          <div>
-            <div className="module-title">বিল তালিকা</div>
-            <div className="module-sub">
-              মাস: {period.month || '-'} / {period.year || '-'} | মোট {meta.total} জন
-            </div>
+      <div className="billing-container">
+        <div className="billing-filters-section">
+          <div className="filter-grid">
+            <label className="filter-item">
+              <span>এরিয়া</span>
+              <select
+                value={filters.areaId}
+                onChange={(event) => setFilters((prev) => ({ ...prev, areaId: event.target.value }))}
+              >
+                <option value="">সব</option>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-item">
+              <span>স্ট্যাটাস</span>
+              <select
+                value={filters.status}
+                onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-item">
+              <span>কালেক্টর</span>
+              <select
+                value={filters.collectorId}
+                onChange={(event) => setFilters((prev) => ({ ...prev, collectorId: event.target.value }))}
+              >
+                <option value="">সব</option>
+                {collectors.map((collector) => (
+                  <option key={collector.id} value={collector.id}>
+                    {collector.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-item search">
+              <span>সার্চ</span>
+              <input
+                type="text"
+                placeholder="নাম, মোবাইল, আইডি"
+                value={filters.q}
+                onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
+              />
+            </label>
           </div>
         </div>
-        <div className="metric-row">
+
+        <div className="billing-summary">
           <div className="metric-card">
             <div className="metric-value">{formatCurrency(summary.monthAmount)}</div>
             <div className="metric-label">চলতি মাসের বিল</div>
@@ -375,60 +569,11 @@ function Billing() {
             <div className="metric-label">মোট অগ্রিম</div>
           </div>
         </div>
-        <div className="filter-grid">
-          <label className="filter-item">
-            <span>এরিয়া</span>
-            <select
-              value={filters.areaId}
-              onChange={(event) => setFilters((prev) => ({ ...prev, areaId: event.target.value }))}
-            >
-              <option value="">সব</option>
-              {areas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-item">
-            <span>স্ট্যাটাস</span>
-            <select
-              value={filters.status}
-              onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
-            >
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-item">
-            <span>কালেক্টর</span>
-            <select
-              value={filters.collectorId}
-              onChange={(event) => setFilters((prev) => ({ ...prev, collectorId: event.target.value }))}
-            >
-              <option value="">সব</option>
-              {collectors.map((collector) => (
-                <option key={collector.id} value={collector.id}>
-                  {collector.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-item search">
-            <span>সার্চ</span>
-            <input
-              type="text"
-              placeholder="নাম, মোবাইল, আইডি"
-              value={filters.q}
-              onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
-            />
-          </label>
-        </div>
-        {isLoading ? <div className="module-sub">লোড হচ্ছে...</div> : null}
-        <div className="table-top-controls">
+
+        <div className="billing-controls">
+          <div className="billing-info">
+            মাস: {period.month || '-'} / {period.year || '-'} | মোট {meta.total} জন গ্রাহক
+          </div>
           <label className="pagination-select">
             <span>দেখাও</span>
             <select
@@ -446,76 +591,60 @@ function Billing() {
             </select>
           </label>
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>গ্রাহক</th>
-              <th>এরিয়া</th>
-              <th>স্ট্যাটাস</th>
-              <th>মাসিক</th>
-              <th>পরিশোধ</th>
-              <th>বকেয়া</th>
-              <th>অ্যাকশন</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.billId}>
-                <td>
-                  <div className="cell-title">{row.name}</div>
-                  <div className="cell-sub">{row.customerCode}</div>
-                  <div className="cell-sub">{row.mobile || '—'}</div>
-                </td>
-                <td>{row.area?.name || '—'}</td>
-                <td>
-                  <span className={`status-pill ${row.status.toLowerCase()}`}>
-                    {statusLabel(row.status)}
-                  </span>
-                </td>
-                <td>{formatCurrency(row.monthlyFee)}</td>
-                <td>{formatCurrency(row.paidTotal)}</td>
-                <td>{formatCurrency(row.totalDue)}</td>
-                <td>
-                  <div className="action-buttons">
-                    <button className="btn ghost small" type="button" onClick={() => openCollectModal(row)}>
-                      কালেক্ট
-                    </button>
-                    <button className="btn ghost small" type="button" onClick={() => openHistoryModal(row)}>
-                      হিস্টোরি
-                    </button>
-                    <button className="btn outline small" type="button" onClick={() => handlePrint(row)}>
-                      ইনভয়েস
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="pagination-bar">
-          <div className="pagination-info">
-            পেজ {meta.page} / {meta.totalPages}
-          </div>
-          <div className="page-buttons">
+
+        {/* Content Area */}
+        <div className="billing-content">
+          {status && (
+            <div className="status-banner error">
+              <strong>ত্রুটি:</strong> {status}
+            </div>
+          )}
+
+          {isLoading && (
+            <div className="loading-message">লোড হচ্ছে...</div>
+          )}
+
+          {!isLoading && rows.length === 0 && (
+            <div className="empty-message">
+              <p>কোন বিল পাওয়া যায়নি</p>
+            </div>
+          )}
+
+          {!isLoading && rows.length > 0 && (
+            <div className="bill-list">
+              {rows.map((row) => (
+                <BillListItem
+                  key={row.billId}
+                  bill={row}
+                  onMenuClick={menuHandlers}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {!isLoading && rows.length > 0 && perPage !== 'all' && meta.totalPages > 1 && (
+          <div className="pagination-wrapper">
             <button
-              className="btn ghost small"
-              type="button"
-              disabled={perPage === 'all' || meta.page <= 1}
+              className="pagination-btn"
+              disabled={meta.page <= 1}
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             >
-              আগের
+              ‹ আগের
             </button>
+            <div className="pagination-info">
+              পৃষ্ঠা {meta.page} / {meta.totalPages}
+            </div>
             <button
-              className="btn ghost small"
-              type="button"
-              disabled={perPage === 'all' || meta.page >= meta.totalPages}
+              className="pagination-btn"
+              disabled={meta.page >= meta.totalPages}
               onClick={() => setPage((prev) => Math.min(meta.totalPages, prev + 1))}
             >
-              পরের
+              পরের ›
             </button>
           </div>
-        </div>
-        {status ? <div className="status-banner error">{status}</div> : null}
+        )}
       </div>
 
       <div className={`modal-overlay ${collecting ? 'is-open' : ''}`}>
