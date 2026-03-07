@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/AppLayout.jsx'
 
@@ -17,6 +17,22 @@ const billingLabel = (value) => {
   return match ? match.label : value
 }
 
+const getInitial = (name = '') => {
+  const trimmed = String(name).trim()
+  return trimmed ? trimmed[0] : 'গ'
+}
+
+const avatarPalette = ['#f5b55e', '#66a7e6', '#7dc8a7', '#f08ab5', '#b28ce2']
+
+const getAvatarColor = (seed) => {
+  const text = String(seed ?? '')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 997
+  }
+  return avatarPalette[Math.abs(hash) % avatarPalette.length]
+}
+
 const getUserRole = () => {
   const token = localStorage.getItem('auth_token')
   if (!token) return null
@@ -28,6 +44,143 @@ const getUserRole = () => {
   } catch (error) {
     return null
   }
+}
+
+// Customer Menu Dialog
+const CustomerMenuDialog = ({ customer, onClose, onViewDetails, onEdit, onDelete, menuRef }) => {
+  return (
+    <div className="menu-popover" ref={menuRef}>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onViewDetails(customer)
+          onClose()
+        }}
+        title="বিস্তারিত দেখুন"
+      >
+        ডিটেইলস
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onEdit(customer)
+          onClose()
+        }}
+        title="গ্রাহক এডিট"
+      >
+        এডিট
+      </button>
+      <button
+        className="menu-item"
+        onClick={() => {
+          onDelete(customer)
+          onClose()
+        }}
+        title="গ্রাহক ডিলিট"
+      >
+        ডিলিট
+      </button>
+    </div>
+  )
+}
+
+// Customer Row Component
+const CustomerListRow = ({ customer, onMenuClick, isSelected, role, onToggleSelect }) => {
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef(null)
+  const buttonRef = useRef(null)
+
+  useEffect(() => {
+    if (!showMenu) return undefined
+    const handleClickOutside = (event) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target)
+      ) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
+  return (
+    <div className={`customer-row ${showMenu ? 'menu-open' : ''}`}>
+      {role === 'ADMIN' && (
+        <div className="customer-checkbox">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(customer.id)}
+            style={{ cursor: 'pointer' }}
+          />
+        </div>
+      )}
+      <div
+        className="customer-avatar"
+        aria-hidden="true"
+        style={{ background: getAvatarColor(customer.id || customer.customerCode) }}
+      >
+        <span>{getInitial(customer.name)}</span>
+      </div>
+
+      <div className="customer-main-info">
+        <h4 className="customer-name">{customer.name}</h4>
+        <span className="customer-id">{customer.customerCode}</span>
+        <div className="customer-contact-info">
+          <div className="contact-line">{customer.area?.name || '—'}</div>
+          <div className="contact-line">{customer.mobile || '—'}</div>
+        </div>
+      </div>
+
+      <div className="customer-right-section">
+        <div className="customer-values">
+          <div className="value-item">
+            <span className="value-label">টাইপ</span>
+            <span className="value-text">{customer.customerType?.name || '—'}</span>
+          </div>
+          <div className="value-item">
+            <span className="value-label">বিলিং</span>
+            <span className={`status-pill ${(customer.billingType || 'ACTIVE').toLowerCase()}`}>
+              {billingLabel(customer.billingType || 'ACTIVE')}
+            </span>
+          </div>
+        </div>
+        <div className="customer-amounts">
+          <div className="amount-item">
+            <span className="amount-label">মাসিক</span>
+            <span className="amount-value">৳ {customer.monthlyFee ?? 0}</span>
+          </div>
+          <div className="amount-item">
+            <span className="amount-label">বকেয়া</span>
+            <span className="amount-value due">৳ {customer.dueBalance ?? 0}</span>
+          </div>
+        </div>
+        <div className="menu-anchor">
+          <button
+            ref={buttonRef}
+            className="menu-button"
+            onClick={() => setShowMenu((prev) => !prev)}
+            title="অপশন"
+          >
+            ⋮
+          </button>
+          {showMenu && (
+            <CustomerMenuDialog
+              customer={customer}
+              onClose={() => setShowMenu(false)}
+              onViewDetails={onMenuClick.onViewDetails}
+              onEdit={onMenuClick.onEdit}
+              onDelete={onMenuClick.onDelete}
+              menuRef={menuRef}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function Customers() {
@@ -103,7 +256,7 @@ function Customers() {
       if (areasRes.ok) setAreas(areasData.data || [])
       if (typesRes.ok) setTypes(typesData.data || [])
     } catch (error) {
-      setStatus('ফিল্টার লোড করা যায়নি')
+      setStatus('ফিল্টার লোড করা যায়নি')
     }
   }
 
@@ -117,7 +270,7 @@ function Customers() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'গ্রাহক লোড করা যায়নি')
+        throw new Error(data.error || 'গ্রাহক লোড করা যায়নি')
       }
       setRows(data.data || [])
       if (data.meta) {
@@ -201,7 +354,7 @@ function Customers() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'গ্রাহক তৈরি করা যায়নি')
+        throw new Error(data.error || 'গ্রাহক তৈরি করা যায়নি')
       }
       resetForm()
       setEditing(null)
@@ -244,7 +397,7 @@ function Customers() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'ডিলিট করা যায়নি')
+        throw new Error(data.error || 'ডিলিট করা যায়নি')
       }
       await loadCustomers()
     } catch (error) {
@@ -381,7 +534,7 @@ function Customers() {
       })
       const data = await response.json()
       if (!response.ok) {
-        throw new Error(data.error || 'ইমপোর্ট ব্যর্থ হয়েছে')
+        throw new Error(data.error || 'ইমপোর্ট ব্যর্থ হয়েছে')
       }
       setImportSummary(data.summary || null)
       setImportErrors(data.errors || [])
@@ -395,10 +548,16 @@ function Customers() {
     }
   }
 
+  const menuHandlers = {
+    onViewDetails: (row) => navigate(`/customers/${row.id}`),
+    onEdit: handleEdit,
+    onDelete: openDelete,
+  }
+
   return (
     <AppLayout title="গ্রাহক" subtitle="গ্রাহক তালিকা ও ফিল্টার">
-      <div className="module-card">
-        <div className="module-header">
+      <div className="customers-container">
+        <div className="customers-header">
           <div>
             <div className="module-title">গ্রাহক তালিকা</div>
             <div className="module-sub">মোট {meta.total} জন</div>
@@ -451,7 +610,7 @@ function Customers() {
         </div>
         <div className="filter-grid">
           <label className="filter-item">
-            <span>এরিয়া</span>
+            <span>এরিয়া</span>
             <select
               value={filters.areaId}
               onChange={(event) => setFilters((prev) => ({ ...prev, areaId: event.target.value }))}
@@ -537,74 +696,18 @@ function Customers() {
             </select>
           </label>
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>              {role === 'ADMIN' && (
-                <th style={{ width: '40px' }}>
-                  <input
-                    type="checkbox"
-                    checked={rows.length > 0 && selectedCustomers.size === rows.length}
-                    onChange={handleSelectAll}
-                    style={{ cursor: 'pointer' }}
-                  />
-                </th>
-              )}              <th>গ্রাহক</th>
-              <th>এরিয়া</th>
-              <th>টাইপ</th>
-              <th>বিলিং</th>
-              <th>মাসিক</th>
-              <th>বকেয়া</th>
-              <th>অ্যাকশন</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                {role === 'ADMIN' && (
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selectedCustomers.has(row.id)}
-                      onChange={() => handleSelectOne(row.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </td>
-                )}
-                <td>
-                  <div className="cell-title">{row.name}</div>
-                  <div className="cell-sub">{row.customerCode}</div>
-                  <div className="cell-sub">{row.mobile}</div>
-                </td>
-                <td>{row.area?.name || '—'}</td>
-                <td>{row.customerType?.name || '—'}</td>
-                <td>
-                  <span className={`status-pill ${(row.billingType || 'ACTIVE').toLowerCase()}`}>
-                    {billingLabel(row.billingType || 'ACTIVE')}
-                  </span>
-                </td>
-                <td>৳ {row.monthlyFee ?? 0}</td>
-                <td>৳ {row.dueBalance ?? 0}</td>
-                <td>
-                  <div className="action-buttons">
-                    <button
-                      className="btn ghost small"
-                      type="button"
-                      onClick={() => navigate(`/customers/${row.id}`)}
-                    >
-                      ডিটেইলস
-                    </button>
-                    <button className="btn ghost small" type="button" onClick={() => handleEdit(row)}>
-                      এডিট
-                    </button>
-                    <button className="btn outline small" type="button" onClick={() => openDelete(row)}>
-                      ডিলিট
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="customers-list">
+          {rows.map((row) => (
+            <CustomerListRow
+              key={row.id}
+              customer={row}
+              onMenuClick={menuHandlers}
+              isSelected={selectedCustomers.has(row.id)}
+              role={role}
+              onToggleSelect={handleSelectOne}
+            />
+          ))}
+        </div>
         <div className="pagination-bar">
           <div className="pagination-info">
             পেজ {meta.page} / {meta.totalPages}
@@ -647,12 +750,12 @@ function Customers() {
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-grid">
               <label className="field">
-                <span>এরিয়া</span>
+                <span>এরিয়া</span>
                 <select
                   value={form.areaId}
                   onChange={(event) => handleFormChange('areaId', event.target.value)}
                 >
-                  <option value="">এরিয়া নির্বাচন</option>
+                  <option value="">এরিয়া নির্বাচন</option>
                   {areas.map((area) => (
                     <option key={area.id} value={area.id}>
                       {area.name}
@@ -735,13 +838,13 @@ function Customers() {
                 />
               </label>
               <label className="field">
-                <span>বকেয়া বিল</span>
+                <span>বকেয়া বিল</span>
                 <input
                   type="number"
                   min="0"
                   value={form.dueBalance}
                   onChange={(event) => handleFormChange('dueBalance', event.target.value)}
-                  placeholder="বকেয়া বিল"
+                  placeholder="বকেয়া বিল"
                 />
               </label>
               <label className="field">
