@@ -5,12 +5,6 @@ const apiBase = import.meta.env.PROD
   ? '/api'
   : import.meta.env.VITE_API_BASE || 'http://localhost:5000'
 
-const statCards = [
-  { label: 'সঞ্চয়', value: '৳ 2,066,918' },
-  { label: 'প্রগ্রেস', value: '6%' },
-  { label: 'কালেকশন', value: '৳ 114,725' },
-]
-
 const getUserRole = () => {
   const token = localStorage.getItem('auth_token')
   if (!token) return null
@@ -45,6 +39,11 @@ function Dashboard() {
     pendingAmount: 0,
     pendingCount: 0,
   })
+    const [stats, setStats] = useState({
+      savings: 0,
+      progress: 0,
+      monthCollection: 0,
+    })
   const [depositForm, setDepositForm] = useState({
     amount: '',
     depositedAt: formatDateInput(new Date()),
@@ -73,6 +72,22 @@ function Dashboard() {
       setStatus(error.message)
     } finally {
       setIsLoading(false)
+
+      const loadDashboardStats = async () => {
+        if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
+        try {
+          const response = await fetch(`${apiBase}/reports/dashboard-stats`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          const data = await response.json()
+          if (!response.ok) {
+            throw new Error(data.error || 'স্ট্যাটিস্টিক্স লোড করা যায়নি')
+          }
+          setStats(data.data || {})
+        } catch (error) {
+          console.error('Dashboard stats error:', error)
+        }
+      }
     }
   }
 
@@ -95,6 +110,7 @@ function Dashboard() {
 
   useEffect(() => {
     loadSummary()
+      loadDashboardStats()
     loadCollectionSummary()
   }, [token, role])
 
@@ -224,21 +240,27 @@ function Dashboard() {
       <section className="balance-banner">{topBalanceLabel}: {formatCurrency(topBalanceValue)}</section>
 
       <section className="stat-grid">
-        {statCards.map((item) => (
-          <article key={item.label} className="stat-card">
-            <div className="stat-label">{item.label}</div>
-            <div className="stat-value">{item.value}</div>
-          </article>
-        ))}
+        <article className="stat-card">
+          <div className="stat-label">সঞ্চয়</div>
+          <div className="stat-value">{formatCurrency(stats.savings)}</div>
+        </article>
+        <article className="stat-card">
+          <div className="stat-label">প্রগ্রেস</div>
+          <div className="stat-value">{stats.progress}%</div>
+        </article>
+        <article className="stat-card">
+          <div className="stat-label">কালেকশন</div>
+          <div className="stat-value">{formatCurrency(stats.monthCollection)}</div>
+        </article>
       </section>
 
       <section className="progress-card">
         <div className="progress-ring" aria-hidden="true">
-          <div className="progress-inner">6%</div>
+          <div className="progress-inner">{stats.progress}%</div>
         </div>
         <div>
           <div className="progress-title">কালেকশন প্রগ্রেস</div>
-          <div className="progress-sub">এই মাসের সংগ্রহ ৬% সম্পন্ন</div>
+          <div className="progress-sub">এই মাসের সংগ্রহ {stats.progress}% সম্পন্ন</div>
         </div>
       </section>
 

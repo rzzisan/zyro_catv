@@ -260,4 +260,84 @@ router.get('/collection-summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 
   }
 })
 
+/**
+ * GET /api/reports/dashboard-stats
+ * ড্যাশবোর্ড স্ট্যাটিস্টিক্স (সঞ্চয়, প্রগ্রেস, কালেকশন)
+ */
+router.get('/dashboard-stats', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    monthEnd.setHours(23, 59, 59, 999)
+
+    const companyId = req.user.companyId
+
+    // মোট সঞ্চয় (সকল ব্যালেন্স)
+    const allUsers = await prisma.user.findMany({
+      where: { companyId },
+      select: { userId: true },
+    })
+
+    const userIds = allUsers.map(u => u.userId)
+
+    const [collectedData, approvedData, totalBillsData, collectedBillsData] = await Promise.all([
+      // সকল সংগ্রহ করা অর্থ
+      prisma.payment.aggregate({
+        where: {
+          bill: { companyId },
+          collectedById: { in: userIds },
+        },
+        _sum: { amount: true },
+      }),
+      // সকল অনুমোদিত ডিপোজিট
+      prisma.deposit.aggregate({
+        where: {
+          companyId,
+          status: 'APPROVED',
+        },
+        _sum: { amount: true },
+      }),
+      // সকল বিল (মাসিক)
+      prisma.bill.aggregate({
+        where: {
+          companyId,
+          createdAt: { gte: monthStart, lte: monthEnd },
+        },
+        _sum: { amount: true },
+      }),
+      // এই মাসে সংগ্রহ করা বিল
+      prisma.payment.aggregate({
+        where: {
+          bill: { companyId },
+          paidAt: { gte: monthStart, lte: monthEnd },
+        },
+        _sum: { amount: true },
+      }),
+    ])
+
+    const totalCollected = collectedData._sum.amount || 0
+    const totalApproved = approvedData._sum.amount || 0
+    const totalBills = totalBillsData._sum.amount || 0
+    const collectedThisMonth = collectedBillsData._sum.amount || 0
+
+    // সঞ্চয় = সংগ্রহ - অনুমোদিত ডিপোজিট
+    const savings = totalCollected - totalApproved
+
+    // প্রগ্রেস = (এই মাসে সংগ্রহ / এই মাসের মোট বিল) * 100
+    const progress = totalBills > 0 ? ((collectedThisMonth / totalBills) * 100).toFixed(2) : 0
+
+    res.json({
+      data: {
+        savings: Math.max(0, savings), // নেগেটিভ মান প্রতিরোধ
+        progress: Number(progress),
+        monthCollection: collectedThisMonth,
+      },
+    })
+  } catch (error) {
+    console.error('Dashboard stats error:', error)
+    return next(error)
+  }
+})
+
 export default router
