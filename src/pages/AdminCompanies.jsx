@@ -124,13 +124,19 @@ function AdminCompanies() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
-      const data = await response.json()
+
+      const contentType = response.headers.get('content-type') || ''
+      const isJson = contentType.includes('application/json')
+      const data = isJson ? await response.json() : null
 
       if (!response.ok) {
-        throw new Error(data.error || 'কোম্পানির সম্পূর্ণ ডাটা ডিলিট করা যায়নি')
+        if (isJson && data?.error) {
+          throw new Error(data.error)
+        }
+        throw new Error('ডিলিট API endpoint পাওয়া যায়নি বা সার্ভার রিস্টার্ট প্রয়োজন')
       }
 
-      setStatus(data.message || 'কোম্পানি এবং সংশ্লিষ্ট সকল ডাটা মুছে ফেলা হয়েছে')
+      setStatus(data?.message || 'কোম্পানি এবং সংশ্লিষ্ট সকল ডাটা মুছে ফেলা হয়েছে')
 
       if (companies.length === 1 && page > 1) {
         setPage((prev) => Math.max(1, prev - 1))
