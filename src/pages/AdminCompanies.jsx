@@ -20,6 +20,7 @@ function AdminCompanies() {
   const [packages, setPackages] = useState([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
+  const [deletingCompanyId, setDeletingCompanyId] = useState('')
 
   const token = localStorage.getItem('auth_token')
   const limit = 10
@@ -107,6 +108,42 @@ function AdminCompanies() {
     }
   }
 
+  const handleHardDeleteCompany = async (company) => {
+    if (!token) return
+
+    const confirmed = window.confirm(
+      `⚠️ ${company.name} কোম্পানির সকল গ্রাহক/বিল/পেমেন্টসহ সব ডাটা স্থায়ীভাবে মুছে যাবে। নিশ্চিত?`
+    )
+    if (!confirmed) return
+
+    setDeletingCompanyId(company.id)
+    setStatus('')
+
+    try {
+      const response = await fetch(`${apiBase}/admin/companies/${company.id}/hard-delete`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'কোম্পানির সম্পূর্ণ ডাটা ডিলিট করা যায়নি')
+      }
+
+      setStatus(data.message || 'কোম্পানি এবং সংশ্লিষ্ট সকল ডাটা মুছে ফেলা হয়েছে')
+
+      if (companies.length === 1 && page > 1) {
+        setPage((prev) => Math.max(1, prev - 1))
+      } else {
+        await loadCompanies()
+      }
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setDeletingCompanyId('')
+    }
+  }
+
   const pages = Math.ceil(total / limit)
 
   return (
@@ -153,7 +190,19 @@ function AdminCompanies() {
             ) : (
               companies.map((company) => (
                 <tr key={company.id}>
-                  <td className="cell-title">{company.name}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="cell-title">{company.name}</span>
+                      <button
+                        className="btn danger small"
+                        type="button"
+                        onClick={() => handleHardDeleteCompany(company)}
+                        disabled={isLoading || deletingCompanyId === company.id}
+                      >
+                        {deletingCompanyId === company.id ? 'ডিলিট হচ্ছে...' : '⚠️ সম্পূর্ণ ডিলিট'}
+                      </button>
+                    </div>
+                  </td>
                   <td>{company.packageName || '—'}</td>
                   <td>
                     <span className={`status-pill ${company.status === 'ACTIVE' ? 'active' : 'inactive'}`}>

@@ -393,6 +393,129 @@ router.put('/companies/:companyId', requireAuth, requireSuperAdmin, async (req, 
   }
 })
 
+/**
+ * DELETE /api/admin/companies/:companyId/hard-delete
+ * নির্দিষ্ট কোম্পানির সকল ডাটা স্থায়ীভাবে মুছে ফেলা
+ */
+router.delete('/companies/:companyId/hard-delete', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { companyId } = req.params
+
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true },
+    })
+
+    if (!company) {
+      return res.status(404).json({ error: 'কোম্পানি খুঁজে পাওয়া যায়নি' })
+    }
+
+    const summary = await prisma.$transaction(async (tx) => {
+      const users = await tx.user.findMany({
+        where: { companyId },
+        select: { id: true },
+      })
+      const userIds = users.map((user) => user.id)
+
+      const bills = await tx.bill.findMany({
+        where: { companyId },
+        select: { id: true },
+      })
+      const billIds = bills.map((bill) => bill.id)
+
+      const payments = billIds.length
+        ? await tx.payment.findMany({
+            where: { billId: { in: billIds } },
+            select: { id: true },
+          })
+        : []
+      const paymentIds = payments.map((payment) => payment.id)
+
+      const deletedBillLogs = await tx.$executeRawUnsafe(
+        'DELETE bul FROM BillUpdateLog bul INNER JOIN Customer c ON c.id = bul.customerId WHERE c.companyId = ?',
+        companyId
+      )
+
+      const allocationFilters = []
+      if (paymentIds.length) allocationFilters.push({ paymentId: { in: paymentIds } })
+      if (billIds.length) allocationFilters.push({ billId: { in: billIds } })
+
+      const deletedAllocations = allocationFilters.length
+        ? await tx.paymentAllocation.deleteMany({ where: { OR: allocationFilters } })
+        : { count: 0 }
+
+      const deletedPayments = billIds.length
+        ? await tx.payment.deleteMany({ where: { billId: { in: billIds } } })
+        : { count: 0 }
+
+      const deletedBills = await tx.bill.deleteMany({ where: { companyId } })
+      const deletedDeposits = await tx.deposit.deleteMany({ where: { companyId } })
+
+      const collectorAreaFilters = [{ area: { companyId } }]
+      if (userIds.length) {
+        collectorAreaFilters.push({ collectorId: { in: userIds } })
+      }
+      const deletedCollectorAreas = await tx.collectorArea.deleteMany({
+        where: { OR: collectorAreaFilters },
+      })
+
+      const deletedCustomers = await tx.customer.deleteMany({ where: { companyId } })
+      const deletedCustomerTypes = await tx.customerType.deleteMany({ where: { companyId } })
+      const deletedAreas = await tx.area.deleteMany({ where: { companyId } })
+
+      const deletedApiKeys = userIds.length
+        ? await tx.aPIKey.deleteMany({ where: { userId: { in: userIds } } })
+        : { count: 0 }
+      const deletedManagerPermissions = userIds.length
+        ? await tx.managerPermission.deleteMany({ where: { managerId: { in: userIds } } })
+        : { count: 0 }
+
+      const activityFilters = [{ companyId }]
+      if (userIds.length) {
+        activityFilters.push({ userId: { in: userIds } })
+      }
+      const deletedActivityLogs = await tx.activityLog.deleteMany({
+        where: { OR: activityFilters },
+      })
+
+      const deletedAuditTrail = await tx.auditTrail.deleteMany({ where: { companyId } })
+      const deletedSupportTickets = await tx.supportTicket.deleteMany({ where: { companyId } })
+      const deletedSubscription = await tx.companySubscription.deleteMany({ where: { companyId } })
+      const deletedUsers = await tx.user.deleteMany({ where: { companyId } })
+      const deletedCompany = await tx.company.delete({ where: { id: companyId } })
+
+      return {
+        deletedBillLogs,
+        deletedAllocations: deletedAllocations.count,
+        deletedPayments: deletedPayments.count,
+        deletedBills: deletedBills.count,
+        deletedDeposits: deletedDeposits.count,
+        deletedCollectorAreas: deletedCollectorAreas.count,
+        deletedCustomers: deletedCustomers.count,
+        deletedCustomerTypes: deletedCustomerTypes.count,
+        deletedAreas: deletedAreas.count,
+        deletedApiKeys: deletedApiKeys.count,
+        deletedManagerPermissions: deletedManagerPermissions.count,
+        deletedActivityLogs: deletedActivityLogs.count,
+        deletedAuditTrail: deletedAuditTrail.count,
+        deletedSupportTickets: deletedSupportTickets.count,
+        deletedSubscription: deletedSubscription.count,
+        deletedUsers: deletedUsers.count,
+        deletedCompanyId: deletedCompany.id,
+      }
+    })
+
+    return res.json({
+      success: true,
+      message: `${company.name} এবং সংশ্লিষ্ট সকল ডাটা সফলভাবে মুছে ফেলা হয়েছে`,
+      summary,
+    })
+  } catch (error) {
+    console.error('Company hard delete error:', error)
+    return res.status(500).json({ error: 'কোম্পানি সম্পূর্ণ ডিলিট করা যায়নি' })
+  }
+})
+
 // ==================== USER MANAGEMENT ====================
 
 /**

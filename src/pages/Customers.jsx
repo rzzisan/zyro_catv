@@ -435,43 +435,6 @@ function Customers() {
     }
   }
 
-  const handleCleanupAll = async () => {
-    if (!token || role !== 'ADMIN') return
-    const ok = window.confirm(
-      '⚠️ সংকটাপূর্ণ ক্রিয়া!\n\nসকল গ্রাহক, বিল, পেমেন্ট এবং সংশ্লিষ্ট ডাটা স্থায়ীভাবে মুছে যাবে। এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।\n\nনিশ্চিত করুন?'
-    )
-    if (!ok) return
-
-    const doubleCheck = window.confirm(
-      'আবারও নিশ্চিত করুন: সম্পূর্ণ ডাটাবেস থেকে সকল গ্রাহক তথ্য মুছে ফেলা হবে।'
-    )
-    if (!doubleCheck) return
-
-    setIsLoading(true)
-    setStatus('')
-
-    try {
-      const response = await fetch(`${apiBase}/customers/cleanup-all`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setStatus(data.message || 'সকল গ্রাহক ডাটা মুছে ফেলা হয়েছে')
-        setSelectedCustomers(new Set())
-        await loadCustomers()
-      } else {
-        const error = await response.json()
-        setStatus(`ত্রুটি: ${error.error || 'কিছু ভুল হয়েছে'}`)
-      }
-    } catch (error) {
-      setStatus(`ত্রুটি: ${error.message}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleBulkDelete = async () => {
     if (!token || role !== 'ADMIN' || selectedCustomers.size === 0) return
     const count = selectedCustomers.size
@@ -563,17 +526,6 @@ function Customers() {
             <div className="module-sub">মোট {meta.total} জন</div>
           </div>
           <div className="action-buttons">
-            {role === 'ADMIN' && (
-              <button
-                className="btn danger"
-                type="button"
-                onClick={handleCleanupAll}
-                disabled={isLoading}
-                style={{ marginRight: '8px' }}
-              >
-                ⚠️ সম্পূর্ণ ডিলিট
-              </button>
-            )}
             {role === 'ADMIN' && selectedCustomers.size > 0 && (
               <button
                 className="btn danger"
