@@ -72,22 +72,22 @@ function Dashboard() {
       setStatus(error.message)
     } finally {
       setIsLoading(false)
+    }
+  }
 
-      const loadDashboardStats = async () => {
-        if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
-        try {
-          const response = await fetch(`${apiBase}/reports/dashboard-stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          const data = await response.json()
-          if (!response.ok) {
-            throw new Error(data.error || 'স্ট্যাটিস্টিক্স লোড করা যায়নি')
-          }
-          setStats(data.data || {})
-        } catch (error) {
-          console.error('Dashboard stats error:', error)
-        }
+  const loadDashboardStats = async () => {
+    if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
+    try {
+      const response = await fetch(`${apiBase}/reports/dashboard-stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'স্ট্যাটিস্টিক্স লোড করা যায়নি')
       }
+      setStats(data.data || {})
+    } catch (error) {
+      console.error('Dashboard stats error:', error)
     }
   }
 
@@ -110,7 +110,7 @@ function Dashboard() {
 
   useEffect(() => {
     loadSummary()
-      loadDashboardStats()
+    loadDashboardStats()
     loadCollectionSummary()
   }, [token, role])
 
