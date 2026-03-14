@@ -27,6 +27,7 @@ const formatDateInput = (value) => {
 }
 
 const collectorChartPalette = ['#1598f5', '#20bfc1', '#f3b42d', '#f78d1f', '#8b74ff', '#ef476f']
+const monthlyBarPalette = ['#48b8a9', '#ff3b6d', '#ff9f2a', '#38bdf8', '#8b5cf6', '#22c55e']
 
 function Dashboard() {
   const role = getUserRole()
@@ -55,6 +56,7 @@ function Dashboard() {
   })
   const [collectionSummary, setCollectionSummary] = useState([])
   const [collectionTotals, setCollectionTotals] = useState({})
+  const [monthlyPerformance, setMonthlyPerformance] = useState([])
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -114,10 +116,27 @@ function Dashboard() {
     }
   }
 
+  const loadMonthlyPerformance = async () => {
+    if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
+    try {
+      const response = await fetch(`${apiBase}/reports/monthly-performance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'মাসভিত্তিক পারফরম্যান্স লোড করা যায়নি')
+      }
+      setMonthlyPerformance(data.data || [])
+    } catch (error) {
+      console.error('Monthly performance error:', error)
+    }
+  }
+
   useEffect(() => {
     loadSummary()
     loadDashboardStats()
     loadCollectionSummary()
+    loadMonthlyPerformance()
   }, [token, role])
 
   const handleDepositSubmit = async (event) => {
@@ -267,6 +286,45 @@ function Dashboard() {
       gradient: gradientStops ? `conic-gradient(${gradientStops})` : 'conic-gradient(#dbe5f1 0 100%)',
     }
   }, [collectionSummary])
+
+  const monthlyPerformanceChart = useMemo(() => {
+    const rows = monthlyPerformance.length
+      ? monthlyPerformance
+      : [
+          { label: 'Apr', count: 0 },
+          { label: 'May', count: 0 },
+          { label: 'Jun', count: 0 },
+          { label: 'Jul', count: 0 },
+          { label: 'Aug', count: 0 },
+          { label: 'Sep', count: 0 },
+          { label: 'Oct', count: 0 },
+          { label: 'Nov', count: 0 },
+          { label: 'Dec', count: 0 },
+          { label: 'Jan', count: 0 },
+          { label: 'Feb', count: 0 },
+          { label: 'Mar', count: 0 },
+        ]
+
+    const maxCount = Math.max(...rows.map((item) => Number(item.count || 0)), 1)
+    const ticks = Array.from({ length: 6 }, (_, index) => Math.ceil((maxCount * index) / 5))
+
+    const data = rows.map((item, index) => {
+      const count = Number(item.count || 0)
+      const height = count > 0 ? Math.max(8, Math.round((count / maxCount) * 100)) : 0
+      return {
+        ...item,
+        count,
+        height,
+        color: monthlyBarPalette[index % monthlyBarPalette.length],
+      }
+    })
+
+    return {
+      data,
+      maxCount,
+      ticks,
+    }
+  }, [monthlyPerformance])
 
   const topBalanceLabel = role === 'MANAGER'
     ? 'কালেক্টরদের অনুমোদিত ডিপোজিট'
@@ -434,6 +492,37 @@ function Dashboard() {
           ) : (
             <div className="collector-chart-empty">চলতি মাসে কালেক্টরভিত্তিক কোনো কালেকশন ডেটা পাওয়া যায়নি</div>
           )}
+        </section>
+      )}
+
+      {['ADMIN', 'MANAGER'].includes(role) && (
+        <section className="performance-chart-card">
+          <div className="module-title">Company Performance (Collected Clients)</div>
+          <div className="module-sub">প্রতিমাসে কতজন গ্রাহকের বিল কালেক্ট হয়েছে</div>
+
+          <div className="performance-chart-wrap">
+            <div className="performance-y-axis">
+              {[...monthlyPerformanceChart.ticks].reverse().map((tick) => (
+                <span key={tick}>{tick.toLocaleString('bn-BD')}</span>
+              ))}
+            </div>
+
+            <div className="performance-plot">
+              {monthlyPerformanceChart.data.map((item) => (
+                <div key={`${item.year || ''}-${item.month || ''}-${item.label}`} className="performance-col">
+                  <div className="performance-bar-track">
+                    <div
+                      className="performance-bar"
+                      style={{ '--bar-h': `${item.height}%`, '--bar-color': item.color }}
+                    >
+                      {item.count > 0 ? <span>{item.count.toLocaleString('bn-BD')}</span> : null}
+                    </div>
+                  </div>
+                  <div className="performance-month">{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       )}
 

@@ -1092,6 +1092,92 @@ a {
   text-align: center;
 }
 
+.performance-chart-card {
+  margin-top: 1.2rem;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.performance-chart-wrap {
+  margin-top: 0.4rem;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 0.65rem;
+}
+
+.performance-y-axis {
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  align-items: end;
+  color: #5f6d85;
+  font-size: 0.78rem;
+  text-align: right;
+  padding-bottom: 1.3rem;
+}
+
+.performance-plot {
+  min-height: 240px;
+  border-left: 1px solid #cdd8e7;
+  border-bottom: 1px solid #cdd8e7;
+  background-image: repeating-linear-gradient(
+    to top,
+    rgba(173, 188, 207, 0.34) 0px,
+    rgba(173, 188, 207, 0.34) 1px,
+    transparent 1px,
+    transparent 16px
+  );
+  padding: 0.35rem 0.45rem 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.performance-col {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  align-items: end;
+  min-width: 0;
+}
+
+.performance-bar-track {
+  height: 190px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.performance-bar {
+  --bar-h: 0%;
+  --bar-color: #48b8a9;
+  width: 100%;
+  height: var(--bar-h);
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bar-color) 90%, #ffffff) 0%, var(--bar-color) 100%);
+  position: relative;
+  transition: height 280ms ease;
+}
+
+.performance-bar span {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.performance-month {
+  margin-top: 0.4rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #273348;
+}
+
 .module-card {
   background: var(--surface);
   border-radius: 18px;
@@ -1303,6 +1389,32 @@ a {
 
   .collector-legend {
     width: 100%;
+  }
+
+  .performance-chart-wrap {
+    grid-template-columns: 40px 1fr;
+  }
+
+  .performance-y-axis {
+    font-size: 0.68rem;
+  }
+
+  .performance-plot {
+    min-height: 190px;
+    gap: 0.3rem;
+    padding: 0.25rem 0.3rem 0.2rem;
+  }
+
+  .performance-bar-track {
+    height: 145px;
+  }
+
+  .performance-month {
+    font-size: 0.7rem;
+  }
+
+  .performance-bar span {
+    font-size: 0.64rem;
   }
 }
 
