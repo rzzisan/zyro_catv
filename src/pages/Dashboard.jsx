@@ -26,6 +26,9 @@ const formatDateInput = (value) => {
   return date.toISOString().slice(0, 10)
 }
 
+const collectorChartPalette = ['#1598f5', '#20bfc1', '#f3b42d', '#f78d1f', '#8b74ff', '#ef476f']
+const monthlyBarPalette = ['#48b8a9', '#ff3b6d', '#ff9f2a', '#38bdf8', '#8b5cf6', '#22c55e']
+
 function Dashboard() {
   const role = getUserRole()
   const [depositTab, setDepositTab] = useState('deposit')
@@ -53,6 +56,7 @@ function Dashboard() {
   })
   const [collectionSummary, setCollectionSummary] = useState([])
   const [collectionTotals, setCollectionTotals] = useState({})
+  const [monthlyPerformance, setMonthlyPerformance] = useState([])
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -112,10 +116,27 @@ function Dashboard() {
     }
   }
 
+  const loadMonthlyPerformance = async () => {
+    if (!token || !['ADMIN', 'MANAGER'].includes(role)) return
+    try {
+      const response = await fetch(`${apiBase}/reports/monthly-performance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'মাসভিত্তিক পারফরম্যান্স লোড করা যায়নি')
+      }
+      setMonthlyPerformance(data.data || [])
+    } catch (error) {
+      console.error('Monthly performance error:', error)
+    }
+  }
+
   useEffect(() => {
     loadSummary()
     loadDashboardStats()
     loadCollectionSummary()
+    loadMonthlyPerformance()
   }, [token, role])
 
   const handleDepositSubmit = async (event) => {
@@ -147,14 +168,6 @@ function Dashboard() {
       setIsLoading(false)
     }
   }
-
-  const managerStats = useMemo(
-    () => [
-      { label: 'পেন্ডিং ডিপোজিট', value: formatCurrency(summary.pendingAmount), tone: 'teal' },
-      { label: 'ডিপোজিট সংখ্যা', value: String(summary.pendingCount || 0), tone: 'sky' },
-    ],
-    [summary.pendingAmount, summary.pendingCount]
-  )
 
   const dashboardVisualCards = useMemo(() => {
     const totalDue = Number(stats.totalDue || 0)
@@ -203,6 +216,107 @@ function Dashboard() {
       },
     ]
   }, [stats])
+
+  const collectorChart = useMemo(() => {
+    const collectorRows = collectionSummary
+      .filter((item) => item.role === 'COLLECTOR' && Number(item.thisMonth?.amount || 0) > 0)
+      .sort((a, b) => Number(b.thisMonth?.amount || 0) - Number(a.thisMonth?.amount || 0))
+
+    if (!collectorRows.length) {
+      return {
+        hasData: false,
+        total: 0,
+        segments: [],
+        gradient: 'conic-gradient(#dbe5f1 0 100%)',
+      }
+    }
+
+    const maxSlices = 6
+    const slicedRows = collectorRows.slice(0, maxSlices)
+    const restRows = collectorRows.slice(maxSlices)
+    const otherAmount = restRows.reduce((sum, item) => sum + Number(item.thisMonth?.amount || 0), 0)
+
+    const sourceRows = otherAmount > 0
+      ? [
+          ...slicedRows,
+          { id: 'others', name: 'অন্যান্য', thisMonth: { amount: otherAmount } },
+        ]
+      : slicedRows
+
+    const total = sourceRows.reduce((sum, item) => sum + Number(item.thisMonth?.amount || 0), 0)
+    let currentPercent = 0
+
+    const segments = sourceRows.map((item, index) => {
+      const amount = Number(item.thisMonth?.amount || 0)
+      const rawPercent = total > 0 ? (amount / total) * 100 : 0
+      const start = currentPercent
+      currentPercent += rawPercent
+      const end = Math.min(100, currentPercent)
+      return {
+        id: item.id,
+        name: item.name,
+        amount,
+        percent: rawPercent,
+        color: collectorChartPalette[index % collectorChartPalette.length],
+        start,
+        end,
+      }
+    })
+
+    if (segments.length) {
+      segments[segments.length - 1].end = 100
+    }
+
+    const gradientStops = segments
+      .map((item) => `${item.color} ${item.start.toFixed(2)}% ${item.end.toFixed(2)}%`)
+      .join(', ')
+
+    return {
+      hasData: total > 0,
+      total,
+      segments,
+      gradient: gradientStops ? `conic-gradient(${gradientStops})` : 'conic-gradient(#dbe5f1 0 100%)',
+    }
+  }, [collectionSummary])
+
+  const monthlyPerformanceChart = useMemo(() => {
+    const rows = monthlyPerformance.length
+      ? monthlyPerformance
+      : [
+          { label: 'Apr', count: 0 },
+          { label: 'May', count: 0 },
+          { label: 'Jun', count: 0 },
+          { label: 'Jul', count: 0 },
+          { label: 'Aug', count: 0 },
+          { label: 'Sep', count: 0 },
+          { label: 'Oct', count: 0 },
+          { label: 'Nov', count: 0 },
+          { label: 'Dec', count: 0 },
+          { label: 'Jan', count: 0 },
+          { label: 'Feb', count: 0 },
+          { label: 'Mar', count: 0 },
+        ]
+
+    const maxCount = Math.max(...rows.map((item) => Number(item.count || 0)), 1)
+    const ticks = Array.from({ length: 6 }, (_, index) => Math.ceil((maxCount * index) / 5))
+
+    const data = rows.map((item, index) => {
+      const count = Number(item.count || 0)
+      const height = count > 0 ? Math.max(8, Math.round((count / maxCount) * 100)) : 0
+      return {
+        ...item,
+        count,
+        height,
+        color: monthlyBarPalette[index % monthlyBarPalette.length],
+      }
+    })
+
+    return {
+      data,
+      maxCount,
+      ticks,
+    }
+  }, [monthlyPerformance])
 
   const topBalanceLabel = role === 'MANAGER'
     ? 'কালেক্টরদের অনুমোদিত ডিপোজিট'
@@ -324,15 +438,75 @@ function Dashboard() {
         ))}
       </section>
 
-      <section className="section-title">ডিপোজিট</section>
-      <section className="pill-grid">
-        {managerStats.map((item) => (
-          <article key={item.label} className={`pill-card tone-${item.tone}`}>
-            <div className="pill-value">{item.value}</div>
-            <div className="pill-label">{item.label}</div>
-          </article>
-        ))}
-      </section>
+      {['ADMIN', 'MANAGER'].includes(role) && (
+        <div className="dashboard-dual-charts">
+          <section className="collector-chart-card">
+            <div className="collector-chart-header">
+              <div className="module-title">কালেক্টর ওয়াইস চলতি মাসের বিল কালেকশন</div>
+              <div className="module-sub">মোট কালেকশনের মধ্যে কে কত শতাংশ সংগ্রহ করেছে</div>
+            </div>
+
+            {collectorChart.hasData ? (
+              <div className="collector-chart-layout">
+                <div className="collector-donut-shell" aria-hidden="true">
+                  <div className="collector-donut" style={{ '--collector-chart': collectorChart.gradient }}>
+                    <div className="collector-donut-hole">
+                      <strong>{formatCurrency(collectorChart.total)}</strong>
+                      <span>মোট কালেকশন</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="collector-legend">
+                  {collectorChart.segments.map((item) => (
+                    <div key={item.id} className="collector-legend-item">
+                      <div className="collector-legend-main">
+                        <span className="collector-color-dot" style={{ backgroundColor: item.color }} />
+                        <span className="collector-name">{item.name}</span>
+                      </div>
+                      <div className="collector-legend-meta">
+                        <span>{item.percent.toFixed(1)}%</span>
+                        <span>{formatCurrency(item.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="collector-chart-empty">চলতি মাসে কালেক্টরভিত্তিক কোনো কালেকশন ডেটা পাওয়া যায়নি</div>
+            )}
+          </section>
+
+          <section className="performance-chart-card">
+            <div className="module-title">Company Performance (Collected Clients)</div>
+            <div className="module-sub">প্রতিমাসে কতজন গ্রাহকের বিল কালেক্ট হয়েছে</div>
+
+            <div className="performance-chart-wrap">
+              <div className="performance-y-axis">
+                {[...monthlyPerformanceChart.ticks].reverse().map((tick) => (
+                  <span key={tick}>{tick.toLocaleString('bn-BD')}</span>
+                ))}
+              </div>
+
+              <div className="performance-plot">
+                {monthlyPerformanceChart.data.map((item) => (
+                  <div key={`${item.year || ''}-${item.month || ''}-${item.label}`} className="performance-col">
+                    <div className="performance-bar-track">
+                      <div
+                        className="performance-bar"
+                        style={{ '--bar-h': `${item.height}%`, '--bar-color': item.color }}
+                      >
+                        {item.count > 0 ? <span>{item.count.toLocaleString('bn-BD')}</span> : null}
+                      </div>
+                    </div>
+                    <div className="performance-month">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {['ADMIN', 'MANAGER'].includes(role) && (
         <section className="module-card">

@@ -39,6 +39,8 @@ const resolveRange = (query) => {
   return { start: startOfDay(now), end: endOfDay(now), mode: 'today' }
 }
 
+const monthShortLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 router.get('/collections', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
     const { collectorId } = req.query
@@ -407,6 +409,83 @@ router.get('/dashboard-stats', requireAuth, requireRole(['ADMIN', 'MANAGER']), a
     })
   } catch (error) {
     console.error('Dashboard stats error:', error)
+    return next(error)
+  }
+})
+
+/**
+ * GET /api/reports/monthly-performance
+ * শেষ ১২ মাসে মাসভিত্তিক কতজন গ্রাহকের বিল কালেক্ট হয়েছে (unique customer count)
+ */
+router.get('/monthly-performance', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const now = new Date()
+    const months = []
+    const monthBuckets = new Map()
+
+    for (let index = 11; index >= 0; index -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1)
+      const year = date.getFullYear()
+      const month = date.getMonth() + 1
+      const key = `${year}-${String(month).padStart(2, '0')}`
+      const item = {
+        key,
+        year,
+        month,
+        label: monthShortLabels[month - 1],
+      }
+      months.push(item)
+      monthBuckets.set(key, new Set())
+    }
+
+    const firstMonth = months[0]
+    const lastMonth = months[months.length - 1]
+    const start = new Date(firstMonth.year, firstMonth.month - 1, 1)
+    const end = endOfDay(new Date(lastMonth.year, lastMonth.month, 0))
+
+    const payments = await prisma.payment.findMany({
+      where: {
+        paidAt: {
+          gte: start,
+          lte: end,
+        },
+        bill: {
+          companyId: req.user.companyId,
+        },
+      },
+      select: {
+        paidAt: true,
+        bill: {
+          select: {
+            customerId: true,
+          },
+        },
+      },
+    })
+
+    for (const payment of payments) {
+      const date = new Date(payment.paidAt)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const customerId = payment.bill?.customerId
+      if (!customerId || !monthBuckets.has(key)) continue
+      monthBuckets.get(key).add(customerId)
+    }
+
+    const data = months.map((item) => ({
+      month: item.month,
+      year: item.year,
+      label: item.label,
+      count: monthBuckets.get(item.key)?.size || 0,
+    }))
+
+    return res.json({
+      data,
+      range: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+    })
+  } catch (error) {
     return next(error)
   }
 })
