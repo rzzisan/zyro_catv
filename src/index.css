@@ -803,6 +803,111 @@ a {
   font-weight: 700;
 }
 
+.dashboard-visual-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 1.2rem;
+}
+
+.visual-stat-card {
+  --tone: #0f7c7b;
+  --tone-soft: rgba(15, 124, 123, 0.13);
+  background: linear-gradient(180deg, #ffffff 0%, #fffefb 100%);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  display: grid;
+  gap: 0.8rem;
+  border: 1px solid rgba(20, 30, 44, 0.06);
+}
+
+.visual-stat-card.tone-rose {
+  --tone: #d14f63;
+  --tone-soft: rgba(209, 79, 99, 0.14);
+}
+
+.visual-stat-card.tone-amber {
+  --tone: #ca7d24;
+  --tone-soft: rgba(202, 125, 36, 0.16);
+}
+
+.visual-stat-card.tone-teal {
+  --tone: #138677;
+  --tone-soft: rgba(19, 134, 119, 0.14);
+}
+
+.visual-stat-card.tone-sky {
+  --tone: #2f7ec1;
+  --tone-soft: rgba(47, 126, 193, 0.16);
+}
+
+.visual-stat-top {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.visual-stat-label {
+  color: #41506b;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.visual-stat-value {
+  color: #071c33;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.visual-stat-sub {
+  color: #6b7891;
+  font-size: 0.82rem;
+}
+
+.visual-bars {
+  height: 72px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--tone-soft) 0%, rgba(255, 255, 255, 0.8) 100%);
+  padding: 0.55rem;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.35rem;
+  align-items: end;
+}
+
+.visual-bars span {
+  height: var(--bar-h, 20%);
+  border-radius: 10px 10px 4px 4px;
+  background: linear-gradient(180deg, var(--tone) 0%, color-mix(in srgb, var(--tone) 70%, #0f172a) 100%);
+  opacity: 0.92;
+}
+
+.visual-progress-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 72px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--tone-soft) 0%, rgba(255, 255, 255, 0.8) 100%);
+}
+
+.visual-progress-ring {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #fff 56%, transparent 57%),
+    conic-gradient(var(--tone) 0 var(--progress-value, 0%), rgba(180, 190, 206, 0.35) var(--progress-value, 0%) 100%);
+  display: grid;
+  place-items: center;
+}
+
+.visual-progress-ring span {
+  font-weight: 800;
+  color: var(--tone);
+  font-size: 0.92rem;
+}
+
 .progress-card {
   margin-top: 1.6rem;
   background: var(--surface);
