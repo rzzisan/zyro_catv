@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AppLayout from '../components/AppLayout.jsx'
 
 const apiBase = import.meta.env.PROD
@@ -83,6 +83,12 @@ const monthLabels = [
   'ডিসেম্বর',
 ]
 
+const initialSummary = {
+  totalCollectors: 0,
+  totalAmount: 0,
+  totalCount: 0,
+}
+
 const getUserRole = () => {
   const token = localStorage.getItem('auth_token')
   if (!token) return null
@@ -105,19 +111,20 @@ const resolveDueDate = (periodMonth, periodYear) => {
 }
 
 function ReportsAllMonths() {
+  const today = new Date()
+  const todayAsInput = formatDateInput(today)
   const [rows, setRows] = useState([])
   const [detailRows, setDetailRows] = useState([])
   const [collectors, setCollectors] = useState([])
   const [filters, setFilters] = useState({
+    filterType: 'month',
     month: String(new Date().getMonth() + 1),
     year: String(new Date().getFullYear()),
+    startDate: todayAsInput,
+    endDate: todayAsInput,
     collectorId: '',
   })
-  const [summary, setSummary] = useState({
-    totalCollectors: 0,
-    totalAmount: 0,
-    totalCount: 0,
-  })
+  const [summary, setSummary] = useState(initialSummary)
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const role = getUserRole()
@@ -128,11 +135,24 @@ function ReportsAllMonths() {
     const params = new URLSearchParams()
     params.append('details', 'true')
     if (filters.collectorId) params.append('collectorId', filters.collectorId)
-    params.append('month', filters.month)
-    params.append('year', filters.year)
+
+    if (filters.filterType === 'range') {
+      if (filters.startDate) params.append('startDate', filters.startDate)
+      if (filters.endDate) params.append('endDate', filters.endDate)
+    } else {
+      params.append('month', filters.month)
+      params.append('year', filters.year)
+    }
+
     const query = params.toString()
     return query ? `?${query}` : ''
   }, [filters])
+
+  const invalidRange = useMemo(() => {
+    if (filters.filterType !== 'range') return false
+    if (!filters.startDate || !filters.endDate) return false
+    return new Date(filters.startDate) > new Date(filters.endDate)
+  }, [filters.filterType, filters.startDate, filters.endDate])
 
   const loadCollectors = async () => {
     if (!token) return
@@ -162,7 +182,7 @@ function ReportsAllMonths() {
         throw new Error(data.error || 'রিপোর্ট লোড করা যায়নি')
       }
       setRows(data.data || [])
-      setSummary(data.summary || summary)
+      setSummary(data.summary || initialSummary)
       setDetailRows(data.details || [])
     } catch (error) {
       setStatus(error.message)
@@ -176,8 +196,15 @@ function ReportsAllMonths() {
   }, [])
 
   useEffect(() => {
+    if (invalidRange) {
+      setRows([])
+      setDetailRows([])
+      setSummary(initialSummary)
+      setStatus('শুরুর তারিখ শেষ তারিখের পরে হতে পারবে না')
+      return
+    }
     loadReports()
-  }, [filterQuery])
+  }, [filterQuery, invalidRange])
 
   return (
     <AppLayout title="রিপোর্ট" subtitle="সকল মাসের বিল কালেকশন">
@@ -206,30 +233,70 @@ function ReportsAllMonths() {
 
         <div className="reports-filters">
           <label className="filter-item">
-            <span>মাস</span>
+            <span>ফিল্টার ধরণ</span>
             <select
-              value={filters.month}
-              onChange={(event) => setFilters((prev) => ({ ...prev, month: event.target.value }))}
+              value={filters.filterType}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  filterType: event.target.value,
+                }))
+              }
             >
-              {monthLabels.map((label, index) => {
-                const value = String(index + 1)
-                return (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                )
-              })}
+              <option value="month">মাস অনুযায়ী</option>
+              <option value="range">তারিখ থেকে-তারিখ পর্যন্ত</option>
             </select>
           </label>
-          <label className="filter-item">
-            <span>বছর</span>
-            <input
-              type="number"
-              min="2020"
-              value={filters.year}
-              onChange={(event) => setFilters((prev) => ({ ...prev, year: event.target.value }))}
-            />
-          </label>
+
+          {filters.filterType === 'month' ? (
+            <>
+              <label className="filter-item">
+                <span>মাস</span>
+                <select
+                  value={filters.month}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, month: event.target.value }))}
+                >
+                  {monthLabels.map((label, index) => {
+                    const value = String(index + 1)
+                    return (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+              <label className="filter-item">
+                <span>বছর</span>
+                <input
+                  type="number"
+                  min="2020"
+                  value={filters.year}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, year: event.target.value }))}
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="filter-item">
+                <span>শুরুর তারিখ</span>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
+                />
+              </label>
+              <label className="filter-item">
+                <span>শেষ তারিখ</span>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
+                />
+              </label>
+            </>
+          )}
+
           {role === 'COLLECTOR' ? null : (
             <label className="filter-item">
               <span>কালেক্টর</span>
@@ -285,8 +352,6 @@ function ReportsAllMonths() {
               </thead>
               <tbody>
                 {detailRows.map((row, index) => {
-                  const periodMonth = row.bill?.periodMonth
-                  const periodYear = row.bill?.periodYear
                   return (
                     <tr key={row.id}>
                       <td>{index + 1}</td>
