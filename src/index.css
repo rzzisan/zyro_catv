@@ -974,6 +974,124 @@ a {
   opacity: 0.9;
 }
 
+.collector-chart-card {
+  margin-top: 1.2rem;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 1.2rem;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 1rem;
+}
+
+.collector-chart-header {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.collector-chart-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 1.2rem;
+  align-items: center;
+}
+
+.collector-donut-shell {
+  display: grid;
+  place-items: center;
+}
+
+.collector-donut {
+  --collector-chart: conic-gradient(#dbe5f1 0 100%);
+  width: 188px;
+  height: 188px;
+  border-radius: 50%;
+  background: var(--collector-chart);
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(14, 25, 46, 0.06);
+}
+
+.collector-donut-hole {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.3rem;
+  box-shadow: 0 8px 20px rgba(17, 27, 44, 0.16);
+}
+
+.collector-donut-hole strong {
+  font-size: 0.72rem;
+  line-height: 1.15;
+  color: #0c2340;
+}
+
+.collector-donut-hole span {
+  font-size: 0.66rem;
+  color: #6b7891;
+}
+
+.collector-legend {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.collector-legend-item {
+  background: #f8fbff;
+  border: 1px solid #e7edf7;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.collector-legend-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.collector-color-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.collector-name {
+  font-weight: 700;
+  color: #1f2b42;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collector-legend-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.12rem;
+  font-size: 0.82rem;
+  color: #45556f;
+  font-weight: 700;
+}
+
+.collector-chart-empty {
+  border-radius: 12px;
+  background: #f6f9fc;
+  border: 1px dashed #ccd8ea;
+  color: #5f6d85;
+  font-weight: 600;
+  padding: 1rem;
+  text-align: center;
+}
+
 .module-card {
   background: var(--surface);
   border-radius: 18px;
@@ -1175,6 +1293,17 @@ a {
   margin-top: 2rem;
   font-weight: 700;
   text-align: center;
+}
+
+@media (max-width: 900px) {
+  .collector-chart-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .collector-legend {
+    width: 100%;
+  }
 }
 
 .stat-pill {

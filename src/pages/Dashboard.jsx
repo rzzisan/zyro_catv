@@ -26,6 +26,8 @@ const formatDateInput = (value) => {
   return date.toISOString().slice(0, 10)
 }
 
+const collectorChartPalette = ['#1598f5', '#20bfc1', '#f3b42d', '#f78d1f', '#8b74ff', '#ef476f']
+
 function Dashboard() {
   const role = getUserRole()
   const [depositTab, setDepositTab] = useState('deposit')
@@ -204,6 +206,68 @@ function Dashboard() {
     ]
   }, [stats])
 
+  const collectorChart = useMemo(() => {
+    const collectorRows = collectionSummary
+      .filter((item) => item.role === 'COLLECTOR' && Number(item.thisMonth?.amount || 0) > 0)
+      .sort((a, b) => Number(b.thisMonth?.amount || 0) - Number(a.thisMonth?.amount || 0))
+
+    if (!collectorRows.length) {
+      return {
+        hasData: false,
+        total: 0,
+        segments: [],
+        gradient: 'conic-gradient(#dbe5f1 0 100%)',
+      }
+    }
+
+    const maxSlices = 6
+    const slicedRows = collectorRows.slice(0, maxSlices)
+    const restRows = collectorRows.slice(maxSlices)
+    const otherAmount = restRows.reduce((sum, item) => sum + Number(item.thisMonth?.amount || 0), 0)
+
+    const sourceRows = otherAmount > 0
+      ? [
+          ...slicedRows,
+          { id: 'others', name: 'অন্যান্য', thisMonth: { amount: otherAmount } },
+        ]
+      : slicedRows
+
+    const total = sourceRows.reduce((sum, item) => sum + Number(item.thisMonth?.amount || 0), 0)
+    let currentPercent = 0
+
+    const segments = sourceRows.map((item, index) => {
+      const amount = Number(item.thisMonth?.amount || 0)
+      const rawPercent = total > 0 ? (amount / total) * 100 : 0
+      const start = currentPercent
+      currentPercent += rawPercent
+      const end = Math.min(100, currentPercent)
+      return {
+        id: item.id,
+        name: item.name,
+        amount,
+        percent: rawPercent,
+        color: collectorChartPalette[index % collectorChartPalette.length],
+        start,
+        end,
+      }
+    })
+
+    if (segments.length) {
+      segments[segments.length - 1].end = 100
+    }
+
+    const gradientStops = segments
+      .map((item) => `${item.color} ${item.start.toFixed(2)}% ${item.end.toFixed(2)}%`)
+      .join(', ')
+
+    return {
+      hasData: total > 0,
+      total,
+      segments,
+      gradient: gradientStops ? `conic-gradient(${gradientStops})` : 'conic-gradient(#dbe5f1 0 100%)',
+    }
+  }, [collectionSummary])
+
   const topBalanceLabel = role === 'MANAGER'
     ? 'কালেক্টরদের অনুমোদিত ডিপোজিট'
     : role === 'ADMIN'
@@ -333,6 +397,45 @@ function Dashboard() {
           </article>
         ))}
       </section>
+
+      {['ADMIN', 'MANAGER'].includes(role) && (
+        <section className="collector-chart-card">
+          <div className="collector-chart-header">
+            <div className="module-title">কালেক্টর ওয়াইস চলতি মাসের বিল কালেকশন</div>
+            <div className="module-sub">মোট কালেকশনের মধ্যে কে কত শতাংশ সংগ্রহ করেছে</div>
+          </div>
+
+          {collectorChart.hasData ? (
+            <div className="collector-chart-layout">
+              <div className="collector-donut-shell" aria-hidden="true">
+                <div className="collector-donut" style={{ '--collector-chart': collectorChart.gradient }}>
+                  <div className="collector-donut-hole">
+                    <strong>{formatCurrency(collectorChart.total)}</strong>
+                    <span>মোট কালেকশন</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="collector-legend">
+                {collectorChart.segments.map((item) => (
+                  <div key={item.id} className="collector-legend-item">
+                    <div className="collector-legend-main">
+                      <span className="collector-color-dot" style={{ backgroundColor: item.color }} />
+                      <span className="collector-name">{item.name}</span>
+                    </div>
+                    <div className="collector-legend-meta">
+                      <span>{item.percent.toFixed(1)}%</span>
+                      <span>{formatCurrency(item.amount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="collector-chart-empty">চলতি মাসে কালেক্টরভিত্তিক কোনো কালেকশন ডেটা পাওয়া যায়নি</div>
+          )}
+        </section>
+      )}
 
       {['ADMIN', 'MANAGER'].includes(role) && (
         <section className="module-card">
