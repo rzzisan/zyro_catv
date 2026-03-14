@@ -267,30 +267,59 @@ router.get('/collection-summary', requireAuth, requireRole(['ADMIN', 'MANAGER', 
 router.get('/dashboard-stats', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
   try {
     const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    monthEnd.setHours(23, 59, 59, 999)
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
 
     const companyId = req.user.companyId
 
-    // মোট সঞ্চয় (সকল ব্যালেন্স)
-    const allUsers = await prisma.user.findMany({
-      where: { companyId },
-      select: { userId: true },
+    const activeCustomers = await prisma.customer.findMany({
+      where: {
+        companyId,
+        billingType: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        monthlyFee: true,
+      },
     })
 
-    const userIds = allUsers.map(u => u.userId)
+    const customerIds = activeCustomers.map((item) => item.id)
 
-    const [collectedData, approvedData, totalBillsData, collectedBillsData] = await Promise.all([
-      // সকল সংগ্রহ করা অর্থ
+    if (customerIds.length) {
+      const monthBills = await prisma.bill.findMany({
+        where: {
+          customerId: { in: customerIds },
+          periodMonth: currentMonth,
+          periodYear: currentYear,
+        },
+        select: { customerId: true },
+      })
+
+      const billedCustomerIds = new Set(monthBills.map((item) => item.customerId))
+      const missingBills = activeCustomers.filter((item) => !billedCustomerIds.has(item.id))
+
+      if (missingBills.length) {
+        await prisma.bill.createMany({
+          data: missingBills.map((item) => ({
+            companyId,
+            customerId: item.id,
+            periodMonth: currentMonth,
+            periodYear: currentYear,
+            amount: item.monthlyFee ?? 0,
+            status: 'DUE',
+          })),
+        })
+      }
+    }
+
+    const [totalCollectedData, approvedData, allBills, monthBills] = await Promise.all([
       prisma.payment.aggregate({
         where: {
           bill: { companyId },
-          collectedById: { in: userIds },
         },
         _sum: { amount: true },
       }),
-      // সকল অনুমোদিত ডিপোজিট
       prisma.deposit.aggregate({
         where: {
           companyId,
@@ -298,40 +327,82 @@ router.get('/dashboard-stats', requireAuth, requireRole(['ADMIN', 'MANAGER']), a
         },
         _sum: { amount: true },
       }),
-      // সকল বিল (মাসিক)
-      prisma.bill.aggregate({
+      prisma.bill.findMany({
+        where: { companyId },
+        select: { id: true, amount: true },
+      }),
+      prisma.bill.findMany({
         where: {
           companyId,
-          createdAt: { gte: monthStart, lte: monthEnd },
+          periodMonth: currentMonth,
+          periodYear: currentYear,
         },
-        _sum: { amount: true },
-      }),
-      // এই মাসে সংগ্রহ করা বিল
-      prisma.payment.aggregate({
-        where: {
-          bill: { companyId },
-          paidAt: { gte: monthStart, lte: monthEnd },
-        },
-        _sum: { amount: true },
+        select: { id: true, amount: true },
       }),
     ])
 
-    const totalCollected = collectedData._sum.amount || 0
+    const allBillIds = allBills.map((item) => item.id)
+    const monthBillIds = monthBills.map((item) => item.id)
+
+    const [allAllocations, monthAllocations] = await Promise.all([
+      allBillIds.length
+        ? prisma.paymentAllocation.findMany({
+            where: { billId: { in: allBillIds } },
+            select: { billId: true, amount: true },
+          })
+        : Promise.resolve([]),
+      monthBillIds.length
+        ? prisma.paymentAllocation.findMany({
+            where: { billId: { in: monthBillIds } },
+            select: { billId: true, amount: true },
+          })
+        : Promise.resolve([]),
+    ])
+
+    const allAllocByBill = allAllocations.reduce((acc, item) => {
+      acc[item.billId] = (acc[item.billId] || 0) + item.amount
+      return acc
+    }, {})
+
+    const monthAllocByBill = monthAllocations.reduce((acc, item) => {
+      acc[item.billId] = (acc[item.billId] || 0) + item.amount
+      return acc
+    }, {})
+
+    const totalDue = allBills.reduce((sum, item) => {
+      const paid = allAllocByBill[item.id] || 0
+      return sum + Math.max(0, item.amount - paid)
+    }, 0)
+
+    const monthDue = monthBills.reduce((sum, item) => {
+      const paid = monthAllocByBill[item.id] || 0
+      return sum + Math.max(0, item.amount - paid)
+    }, 0)
+
+    const monthCollection = monthBills.reduce((sum, item) => {
+      const paid = monthAllocByBill[item.id] || 0
+      return sum + paid
+    }, 0)
+
+    const totalCollected = totalCollectedData._sum.amount || 0
     const totalApproved = approvedData._sum.amount || 0
-    const totalBills = totalBillsData._sum.amount || 0
-    const collectedThisMonth = collectedBillsData._sum.amount || 0
 
     // সঞ্চয় = সংগ্রহ - অনুমোদিত ডিপোজিট
     const savings = totalCollected - totalApproved
 
-    // প্রগ্রেস = (এই মাসে সংগ্রহ / এই মাসের মোট বিল) * 100
-    const progress = totalBills > 0 ? ((collectedThisMonth / totalBills) * 100).toFixed(2) : 0
+    // প্রগ্রেস = (এই মাসে সংগ্রহ / এই মাসের বকেয়া) * 100
+    const progressBase = monthCollection + monthDue
+    const progress = progressBase > 0 ? ((monthCollection / progressBase) * 100).toFixed(2) : 0
+    const normalizedProgress = Math.max(0, Math.min(100, Number(progress)))
 
     res.json({
       data: {
         savings: Math.max(0, savings), // নেগেটিভ মান প্রতিরোধ
         progress: Number(progress),
-        monthCollection: collectedThisMonth,
+        collectionProgress: normalizedProgress,
+        totalDue,
+        monthDue,
+        monthCollection,
       },
     })
   } catch (error) {

@@ -39,11 +39,14 @@ function Dashboard() {
     pendingAmount: 0,
     pendingCount: 0,
   })
-    const [stats, setStats] = useState({
-      savings: 0,
-      progress: 0,
-      monthCollection: 0,
-    })
+  const [stats, setStats] = useState({
+    savings: 0,
+    progress: 0,
+    collectionProgress: 0,
+    monthCollection: 0,
+    totalDue: 0,
+    monthDue: 0,
+  })
   const [depositForm, setDepositForm] = useState({
     amount: '',
     depositedAt: formatDateInput(new Date()),
@@ -85,9 +88,10 @@ function Dashboard() {
       if (!response.ok) {
         throw new Error(data.error || 'স্ট্যাটিস্টিক্স লোড করা যায়নি')
       }
-      setStats(data.data || {})
+      setStats((prev) => ({ ...prev, ...(data.data || {}) }))
     } catch (error) {
       console.error('Dashboard stats error:', error)
+      setStatus(error.message)
     }
   }
 
@@ -151,6 +155,54 @@ function Dashboard() {
     ],
     [summary.pendingAmount, summary.pendingCount]
   )
+
+  const dashboardVisualCards = useMemo(() => {
+    const totalDue = Number(stats.totalDue || 0)
+    const monthDue = Number(stats.monthDue || 0)
+    const monthCollection = Number(stats.monthCollection || 0)
+    const progress = Number(stats.collectionProgress ?? stats.progress ?? 0)
+    const safeProgress = Math.max(0, Math.min(100, progress))
+    const maxAmount = Math.max(totalDue, monthDue, monthCollection, 1)
+
+    return [
+      {
+        key: 'totalDue',
+        tone: 'rose',
+        label: 'সর্ব মোট বকেয়া',
+        value: formatCurrency(totalDue),
+        sub: 'সকল গ্রাহকের বর্তমান বকেয়া',
+        level: Math.max(6, Math.round((totalDue / maxAmount) * 100)),
+        isProgress: false,
+      },
+      {
+        key: 'monthDue',
+        tone: 'amber',
+        label: 'চলতি মাসের বকেয়া',
+        value: formatCurrency(monthDue),
+        sub: 'চলতি মাসের DUE + PARTIAL বিল',
+        level: Math.max(6, Math.round((monthDue / maxAmount) * 100)),
+        isProgress: false,
+      },
+      {
+        key: 'monthCollection',
+        tone: 'teal',
+        label: 'চলতি মাসের কালেকশন',
+        value: formatCurrency(monthCollection),
+        sub: 'চলতি মাসে মোট সংগ্রহ',
+        level: Math.max(6, Math.round((monthCollection / maxAmount) * 100)),
+        isProgress: false,
+      },
+      {
+        key: 'collectionProgress',
+        tone: 'sky',
+        label: 'কালেকশন প্রগ্রেস',
+        value: `${safeProgress.toFixed(2)}%`,
+        sub: 'চলতি মাসের বকেয়ার বিপরীতে সংগ্রহ',
+        level: Math.round(safeProgress),
+        isProgress: true,
+      },
+    ]
+  }, [stats])
 
   const topBalanceLabel = role === 'MANAGER'
     ? 'কালেক্টরদের অনুমোদিত ডিপোজিট'
@@ -239,29 +291,37 @@ function Dashboard() {
     <AppLayout title="ড্যাশবোর্ড" subtitle="আজকের সারসংক্ষেপ">
       <section className="balance-banner">{topBalanceLabel}: {formatCurrency(topBalanceValue)}</section>
 
-      <section className="stat-grid">
-        <article className="stat-card">
-          <div className="stat-label">সঞ্চয়</div>
-          <div className="stat-value">{formatCurrency(stats.savings)}</div>
-        </article>
-        <article className="stat-card">
-          <div className="stat-label">প্রগ্রেস</div>
-          <div className="stat-value">{stats.progress}%</div>
-        </article>
-        <article className="stat-card">
-          <div className="stat-label">কালেকশন</div>
-          <div className="stat-value">{formatCurrency(stats.monthCollection)}</div>
-        </article>
-      </section>
+      <section className="dashboard-visual-grid">
+        {dashboardVisualCards.map((item) => (
+          <article key={item.key} className={`visual-stat-card tone-${item.tone}`}>
+            <div className="visual-stat-top">
+              <div className="visual-stat-label">{item.label}</div>
+              <div className="visual-stat-value">{item.value}</div>
+              <div className="visual-stat-sub">{item.sub}</div>
+            </div>
 
-      <section className="progress-card">
-        <div className="progress-ring" aria-hidden="true">
-          <div className="progress-inner">{stats.progress}%</div>
-        </div>
-        <div>
-          <div className="progress-title">কালেকশন প্রগ্রেস</div>
-          <div className="progress-sub">এই মাসের সংগ্রহ {stats.progress}% সম্পন্ন</div>
-        </div>
+            {item.isProgress ? (
+              <div className="visual-progress-wrap">
+                <div
+                  className="visual-progress-ring"
+                  aria-hidden="true"
+                  style={{ '--progress-value': `${item.level}%` }}
+                >
+                  <span>{item.level}%</span>
+                </div>
+              </div>
+            ) : (
+              <div className="visual-bars" aria-hidden="true">
+                <span style={{ '--bar-h': `${Math.max(16, item.level * 0.45)}%` }} />
+                <span style={{ '--bar-h': `${Math.max(22, item.level * 0.68)}%` }} />
+                <span style={{ '--bar-h': `${Math.max(28, item.level * 0.85)}%` }} />
+                <span style={{ '--bar-h': `${Math.max(18, item.level * 0.56)}%` }} />
+                <span style={{ '--bar-h': `${Math.max(26, item.level * 0.78)}%` }} />
+                <span style={{ '--bar-h': `${Math.max(34, item.level)}%` }} />
+              </div>
+            )}
+          </article>
+        ))}
       </section>
 
       <section className="section-title">ডিপোজিট</section>
