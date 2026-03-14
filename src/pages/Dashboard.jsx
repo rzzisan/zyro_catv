@@ -407,7 +407,7 @@ function Dashboard() {
 
       <section className="dashboard-visual-grid">
         {dashboardVisualCards.map((item) => (
-          <article key={item.key} className={`visual-stat-card tone-${item.tone}`}>
+          <article key={item.key} className={`visual-stat-card visual-tone-${item.tone}`}>
             <div className="visual-stat-top">
               <div className="visual-stat-label">{item.label}</div>
               <div className="visual-stat-value">{item.value}</div>

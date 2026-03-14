@@ -822,22 +822,22 @@ a {
   border: 1px solid rgba(20, 30, 44, 0.06);
 }
 
-.visual-stat-card.tone-rose {
+.visual-stat-card.visual-tone-rose {
   --tone: #d14f63;
   --tone-soft: rgba(209, 79, 99, 0.14);
 }
 
-.visual-stat-card.tone-amber {
+.visual-stat-card.visual-tone-amber {
   --tone: #ca7d24;
   --tone-soft: rgba(202, 125, 36, 0.16);
 }
 
-.visual-stat-card.tone-teal {
+.visual-stat-card.visual-tone-teal {
   --tone: #138677;
   --tone-soft: rgba(19, 134, 119, 0.14);
 }
 
-.visual-stat-card.tone-sky {
+.visual-stat-card.visual-tone-sky {
   --tone: #2f7ec1;
   --tone-soft: rgba(47, 126, 193, 0.16);
 }
