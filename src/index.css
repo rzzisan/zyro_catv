@@ -974,6 +974,20 @@ a {
   opacity: 0.9;
 }
 
+.dashboard-dual-charts {
+  margin-top: 1.2rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.dashboard-dual-charts .collector-chart-card,
+.dashboard-dual-charts .performance-chart-card {
+  margin-top: 0;
+  height: 100%;
+}
+
 .collector-chart-card {
   margin-top: 1.2rem;
   background: var(--surface);
@@ -1382,6 +1396,10 @@ a {
 }
 
 @media (max-width: 900px) {
+  .dashboard-dual-charts {
+    grid-template-columns: 1fr;
+  }
+
   .collector-chart-layout {
     grid-template-columns: 1fr;
     justify-items: center;

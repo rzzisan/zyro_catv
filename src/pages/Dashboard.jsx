@@ -169,14 +169,6 @@ function Dashboard() {
     }
   }
 
-  const managerStats = useMemo(
-    () => [
-      { label: 'পেন্ডিং ডিপোজিট', value: formatCurrency(summary.pendingAmount), tone: 'teal' },
-      { label: 'ডিপোজিট সংখ্যা', value: String(summary.pendingCount || 0), tone: 'sky' },
-    ],
-    [summary.pendingAmount, summary.pendingCount]
-  )
-
   const dashboardVisualCards = useMemo(() => {
     const totalDue = Number(stats.totalDue || 0)
     const monthDue = Number(stats.monthDue || 0)
@@ -446,84 +438,74 @@ function Dashboard() {
         ))}
       </section>
 
-      <section className="section-title">ডিপোজিট</section>
-      <section className="pill-grid">
-        {managerStats.map((item) => (
-          <article key={item.label} className={`pill-card tone-${item.tone}`}>
-            <div className="pill-value">{item.value}</div>
-            <div className="pill-label">{item.label}</div>
-          </article>
-        ))}
-      </section>
-
       {['ADMIN', 'MANAGER'].includes(role) && (
-        <section className="collector-chart-card">
-          <div className="collector-chart-header">
-            <div className="module-title">কালেক্টর ওয়াইস চলতি মাসের বিল কালেকশন</div>
-            <div className="module-sub">মোট কালেকশনের মধ্যে কে কত শতাংশ সংগ্রহ করেছে</div>
-          </div>
+        <div className="dashboard-dual-charts">
+          <section className="collector-chart-card">
+            <div className="collector-chart-header">
+              <div className="module-title">কালেক্টর ওয়াইস চলতি মাসের বিল কালেকশন</div>
+              <div className="module-sub">মোট কালেকশনের মধ্যে কে কত শতাংশ সংগ্রহ করেছে</div>
+            </div>
 
-          {collectorChart.hasData ? (
-            <div className="collector-chart-layout">
-              <div className="collector-donut-shell" aria-hidden="true">
-                <div className="collector-donut" style={{ '--collector-chart': collectorChart.gradient }}>
-                  <div className="collector-donut-hole">
-                    <strong>{formatCurrency(collectorChart.total)}</strong>
-                    <span>মোট কালেকশন</span>
+            {collectorChart.hasData ? (
+              <div className="collector-chart-layout">
+                <div className="collector-donut-shell" aria-hidden="true">
+                  <div className="collector-donut" style={{ '--collector-chart': collectorChart.gradient }}>
+                    <div className="collector-donut-hole">
+                      <strong>{formatCurrency(collectorChart.total)}</strong>
+                      <span>মোট কালেকশন</span>
+                    </div>
                   </div>
                 </div>
+
+                <div className="collector-legend">
+                  {collectorChart.segments.map((item) => (
+                    <div key={item.id} className="collector-legend-item">
+                      <div className="collector-legend-main">
+                        <span className="collector-color-dot" style={{ backgroundColor: item.color }} />
+                        <span className="collector-name">{item.name}</span>
+                      </div>
+                      <div className="collector-legend-meta">
+                        <span>{item.percent.toFixed(1)}%</span>
+                        <span>{formatCurrency(item.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="collector-chart-empty">চলতি মাসে কালেক্টরভিত্তিক কোনো কালেকশন ডেটা পাওয়া যায়নি</div>
+            )}
+          </section>
+
+          <section className="performance-chart-card">
+            <div className="module-title">Company Performance (Collected Clients)</div>
+            <div className="module-sub">প্রতিমাসে কতজন গ্রাহকের বিল কালেক্ট হয়েছে</div>
+
+            <div className="performance-chart-wrap">
+              <div className="performance-y-axis">
+                {[...monthlyPerformanceChart.ticks].reverse().map((tick) => (
+                  <span key={tick}>{tick.toLocaleString('bn-BD')}</span>
+                ))}
               </div>
 
-              <div className="collector-legend">
-                {collectorChart.segments.map((item) => (
-                  <div key={item.id} className="collector-legend-item">
-                    <div className="collector-legend-main">
-                      <span className="collector-color-dot" style={{ backgroundColor: item.color }} />
-                      <span className="collector-name">{item.name}</span>
+              <div className="performance-plot">
+                {monthlyPerformanceChart.data.map((item) => (
+                  <div key={`${item.year || ''}-${item.month || ''}-${item.label}`} className="performance-col">
+                    <div className="performance-bar-track">
+                      <div
+                        className="performance-bar"
+                        style={{ '--bar-h': `${item.height}%`, '--bar-color': item.color }}
+                      >
+                        {item.count > 0 ? <span>{item.count.toLocaleString('bn-BD')}</span> : null}
+                      </div>
                     </div>
-                    <div className="collector-legend-meta">
-                      <span>{item.percent.toFixed(1)}%</span>
-                      <span>{formatCurrency(item.amount)}</span>
-                    </div>
+                    <div className="performance-month">{item.label}</div>
                   </div>
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="collector-chart-empty">চলতি মাসে কালেক্টরভিত্তিক কোনো কালেকশন ডেটা পাওয়া যায়নি</div>
-          )}
-        </section>
-      )}
-
-      {['ADMIN', 'MANAGER'].includes(role) && (
-        <section className="performance-chart-card">
-          <div className="module-title">Company Performance (Collected Clients)</div>
-          <div className="module-sub">প্রতিমাসে কতজন গ্রাহকের বিল কালেক্ট হয়েছে</div>
-
-          <div className="performance-chart-wrap">
-            <div className="performance-y-axis">
-              {[...monthlyPerformanceChart.ticks].reverse().map((tick) => (
-                <span key={tick}>{tick.toLocaleString('bn-BD')}</span>
-              ))}
-            </div>
-
-            <div className="performance-plot">
-              {monthlyPerformanceChart.data.map((item) => (
-                <div key={`${item.year || ''}-${item.month || ''}-${item.label}`} className="performance-col">
-                  <div className="performance-bar-track">
-                    <div
-                      className="performance-bar"
-                      style={{ '--bar-h': `${item.height}%`, '--bar-color': item.color }}
-                    >
-                      {item.count > 0 ? <span>{item.count.toLocaleString('bn-BD')}</span> : null}
-                    </div>
-                  </div>
-                  <div className="performance-month">{item.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       )}
 
       {['ADMIN', 'MANAGER'].includes(role) && (
