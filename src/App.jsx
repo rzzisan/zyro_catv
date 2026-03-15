@@ -35,6 +35,27 @@ import AdminBackups from './pages/AdminBackups.jsx'
 import AdminAnalytics from './pages/AdminAnalytics.jsx'
 import BillReceipt from './pages/BillReceipt.jsx'
 
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
+}
+
+function RestrictedRoute({ blockedRoles, redirectTo = '/dashboard', children }) {
+  const role = getUserRole()
+  if (blockedRoles.includes(role)) {
+    return <Navigate to={redirectTo} replace />
+  }
+  return children
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -57,15 +78,64 @@ function App() {
         <Route path="/reports/current-month" element={<Reports />} />
         <Route path="/reports/all-months" element={<ReportsAllMonths />} />
         <Route path="/reports/due" element={<ReportsDue />} />
-        <Route path="/reports/previous-summary" element={<ReportsPreviousSummary />} />
-        <Route path="/reports/payment-message" element={<ReportsPaymentMessage />} />
-        <Route path="/reports/message-log" element={<ReportsMessageLog />} />
+        <Route
+          path="/reports/previous-summary"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <ReportsPreviousSummary />
+            </RestrictedRoute>
+          )}
+        />
+        <Route
+          path="/reports/payment-message"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <ReportsPaymentMessage />
+            </RestrictedRoute>
+          )}
+        />
+        <Route
+          path="/reports/message-log"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <ReportsMessageLog />
+            </RestrictedRoute>
+          )}
+        />
         <Route path="/deposits" element={<Deposits />} />
         <Route path="/invoice/:billId" element={<InvoicePrint />} />
-        <Route path="/expenses" element={<Expenses />} />
-        <Route path="/expense-categories" element={<ExpenseCategories />} />
-        <Route path="/employees" element={<Employees />} />
-        <Route path="/tutorials" element={<Tutorials />} />
+        <Route
+          path="/expenses"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <Expenses />
+            </RestrictedRoute>
+          )}
+        />
+        <Route
+          path="/expense-categories"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <ExpenseCategories />
+            </RestrictedRoute>
+          )}
+        />
+        <Route
+          path="/employees"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <Employees />
+            </RestrictedRoute>
+          )}
+        />
+        <Route
+          path="/tutorials"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR']}>
+              <Tutorials />
+            </RestrictedRoute>
+          )}
+        />
 
         {/* Admin Routes */}
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
