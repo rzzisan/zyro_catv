@@ -304,6 +304,15 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
     '/managers',
     '/customers',
     '/billing',
+    '/expenses',
+    '/expense-categories',
+    '/employees',
+    '/tutorials',
+  ])
+  const collectorHiddenReports = new Set([
+    '/reports/previous-summary',
+    '/reports/payment-message',
+    '/reports/message-log',
   ])
   const [isReportOpen, setIsReportOpen] = useState(false)
   const isReportActive = location.pathname.startsWith('/reports')
@@ -321,7 +330,9 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
     }
     return true
   })
-  const visibleReports = role === 'SUPER_ADMIN' ? [] : reportModules
+  const visibleReports = role === 'SUPER_ADMIN'
+    ? []
+    : reportModules.filter((item) => !(role === 'COLLECTOR' && collectorHiddenReports.has(item.to)))
 
   useEffect(() => {
     if (isReportActive) {
