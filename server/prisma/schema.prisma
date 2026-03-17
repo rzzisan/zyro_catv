@@ -172,6 +172,7 @@ model Customer {
   customerCode   String
   name           String
   mobile         String
+  stbId          String?     // Set-Top Box ID (optional)
   address        String?
   billingType    BillingType @default(ACTIVE)
   monthlyFee     Int?
@@ -188,6 +189,7 @@ model Customer {
 
   @@unique([companyId, customerCode])
   @@index([companyId, mobile])
+  @@index([companyId, stbId])
   @@index([companyId, deletedAt])
 }
 
