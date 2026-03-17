@@ -213,6 +213,7 @@ function Customers() {
     customerCode: '',
     name: '',
     mobile: '',
+    stbId: '',
     address: '',
     billingType: 'ACTIVE',
     monthlyFee: '',
@@ -306,6 +307,7 @@ function Customers() {
       customerCode: '',
       name: '',
       mobile: '',
+      stbId: '',
       address: '',
       billingType: 'ACTIVE',
       monthlyFee: '',
@@ -375,6 +377,7 @@ function Customers() {
       customerCode: row.customerCode || '',
       name: row.name || '',
       mobile: row.mobile || '',
+      stbId: row.stbId || '',
       address: row.address || '',
       billingType: row.billingType || 'ACTIVE',
       monthlyFee: row.monthlyFee ?? '',
@@ -611,7 +614,7 @@ function Customers() {
             <span>সার্চ</span>
             <input
               type="text"
-              placeholder="নাম, মোবাইল, আইডি"
+              placeholder="নাম, মোবাইল, আইডি, STB ID"
               value={filters.q}
               onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
             />
@@ -754,6 +757,15 @@ function Customers() {
                   value={form.mobile}
                   onChange={(event) => handleFormChange('mobile', event.target.value)}
                   placeholder="01XXXXXXXXX"
+                />
+              </label>
+              <label className="field">
+                <span>STB ID</span>
+                <input
+                  type="text"
+                  value={form.stbId}
+                  onChange={(event) => handleFormChange('stbId', event.target.value)}
+                  placeholder="সেট-টপ বক্স আইডি"
                 />
               </label>
               <label className="field">
