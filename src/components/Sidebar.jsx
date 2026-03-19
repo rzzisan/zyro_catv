@@ -274,6 +274,17 @@ const Icon = ({ name }) => {
           <path d="M8 14h5" />
         </svg>
       )
+    case 'stb-import':
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M8 4v5" />
+          <path d="M16 4v5" />
+          <path d="M12 13v5" />
+          <path d="M9 16l3 3 3-3" />
+        </svg>
+      )
     default:
       return null
   }
