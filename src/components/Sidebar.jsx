@@ -28,6 +28,7 @@ const modules = [
   { label: 'বিল', to: '/billing', icon: 'receipt' },
   { label: 'বিল সংগ্রহ', to: '/collector-billing', icon: 'banknote' },
   { label: 'বিল রিসিট', to: '/bill-receipt', icon: 'print-receipt' },
+  { label: '__SUPPORT_GROUP__' },
   { label: '__REPORT_GROUP__' },
   { label: 'ডিপোজিট', to: '/deposits', icon: 'banknote' },
   { label: 'কোম্পানি সেটিং', to: '/company-settings', icon: 'gear' },
@@ -44,6 +45,12 @@ const reportModules = [
   { label: 'পূর্বের সামারি', to: '/reports/previous-summary', icon: 'history' },
   { label: 'পেমেন্ট মেসেজ', to: '/reports/payment-message', icon: 'message' },
   { label: 'মেসেজ লগ', to: '/reports/message-log', icon: 'log' },
+]
+
+const supportModules = [
+  { label: 'সাপোর্ট ক্যাটাগরী', to: '/support/categories', icon: 'tag', adminOnly: true },
+  { label: 'কাস্টমার সাপোর্ট', to: '/support/customer', icon: 'ticket' },
+  { label: 'সাপোর্ট হিস্টোরি', to: '/support/history', icon: 'history' },
 ]
 
 const Icon = ({ name }) => {
@@ -274,15 +281,12 @@ const Icon = ({ name }) => {
           <path d="M8 14h5" />
         </svg>
       )
-    case 'stb-import':
+    case 'support':
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true" className="nav-icon">
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path d="M3 9h18" />
-          <path d="M8 4v5" />
-          <path d="M16 4v5" />
-          <path d="M12 13v5" />
-          <path d="M9 16l3 3 3-3" />
+          <path d="M4 5h16v10H7l-3 3V5z" />
+          <path d="M9 9h6" />
+          <path d="M9 13h4" />
         </svg>
       )
     default:
@@ -326,7 +330,9 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
     '/reports/message-log',
   ])
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const [isSupportOpen, setIsSupportOpen] = useState(false)
   const isReportActive = location.pathname.startsWith('/reports')
+  const isSupportActive = location.pathname.startsWith('/support')
   const isAdminActive = location.pathname.startsWith('/admin')
   
   // Super Admin দেখাবে admin modules, অন্যরা দেখাবে নরমাল modules
@@ -344,12 +350,21 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
   const visibleReports = role === 'SUPER_ADMIN'
     ? []
     : reportModules.filter((item) => !(role === 'COLLECTOR' && collectorHiddenReports.has(item.to)))
+  const visibleSupports = role === 'SUPER_ADMIN'
+    ? []
+    : supportModules.filter((item) => !(item.adminOnly && role !== 'ADMIN'))
 
   useEffect(() => {
     if (isReportActive) {
       setIsReportOpen(true)
     }
   }, [isReportActive])
+
+  useEffect(() => {
+    if (isSupportActive) {
+      setIsSupportOpen(true)
+    }
+  }, [isSupportActive])
 
   useEffect(() => {
     const fetchCompanyInfo = async () => {
@@ -432,6 +447,40 @@ function Sidebar({ isCollapsed, isMobileOpen, onClose }) {
                     >
                       {reportItem.icon ? <Icon name={reportItem.icon} /> : null}
                       <span className="nav-label">{reportItem.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            )
+          }
+          if (item.label === '__SUPPORT_GROUP__') {
+            return (
+              <div
+                key="customer-support"
+                className={`sidebar-group ${isSupportOpen || isSupportActive ? 'is-open' : ''}`}
+              >
+                <button
+                  className="sidebar-group-title"
+                  type="button"
+                  title="কাস্টমার সাপোর্ট"
+                  onClick={() => setIsSupportOpen((prev) => !prev)}
+                >
+                  <Icon name="support" />
+                  কাস্টমার সাপোর্ট
+                </button>
+                <div className="sidebar-sub">
+                  {visibleSupports.map((supportItem) => (
+                    <NavLink
+                      key={supportItem.to}
+                      to={supportItem.to}
+                      className={({ isActive }) =>
+                        `nav-link ${isActive ? 'active' : ''}`
+                      }
+                      title={supportItem.label}
+                      onClick={onClose}
+                    >
+                      {supportItem.icon ? <Icon name={supportItem.icon} /> : null}
+                      <span className="nav-label">{supportItem.label}</span>
                     </NavLink>
                   ))}
                 </div>

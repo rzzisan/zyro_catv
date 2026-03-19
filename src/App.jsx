@@ -34,6 +34,9 @@ import AdminSupportTickets from './pages/AdminSupportTickets.jsx'
 import AdminBackups from './pages/AdminBackups.jsx'
 import AdminAnalytics from './pages/AdminAnalytics.jsx'
 import BillReceipt from './pages/BillReceipt.jsx'
+import SupportCategories from './pages/SupportCategories.jsx'
+import CustomerSupport from './pages/CustomerSupport.jsx'
+import SupportHistory from './pages/SupportHistory.jsx'
 
 const getUserRole = () => {
   const token = localStorage.getItem('auth_token')
@@ -74,6 +77,16 @@ function App() {
         <Route path="/billing" element={<Billing />} />
         <Route path="/collector-billing" element={<CollectorBilling />} />
         <Route path="/bill-receipt" element={<BillReceipt />} />
+        <Route
+          path="/support/categories"
+          element={(
+            <RestrictedRoute blockedRoles={['COLLECTOR', 'MANAGER', 'SUPER_ADMIN']}>
+              <SupportCategories />
+            </RestrictedRoute>
+          )}
+        />
+        <Route path="/support/customer" element={<CustomerSupport />} />
+        <Route path="/support/history" element={<SupportHistory />} />
         <Route path="/reports" element={<Navigate to="/reports/current-month" replace />} />
         <Route path="/reports/current-month" element={<Reports />} />
         <Route path="/reports/all-months" element={<ReportsAllMonths />} />

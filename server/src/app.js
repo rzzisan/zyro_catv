@@ -11,6 +11,7 @@ import invoiceRoutes from './routes/invoices.js'
 import reportRoutes from './routes/reports.js'
 import userRoutes from './routes/users.js'
 import adminRoutes from './routes/admin.js'
+import supportCategoryRoutes from './routes/support-categories.js'
 
 const app = express()
 
@@ -32,6 +33,7 @@ app.use('/api/invoices', invoiceRoutes)
 app.use('/api/reports', reportRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/support-categories', supportCategoryRoutes)
 
 app.use((err, req, res, next) => {
   console.error(err)
