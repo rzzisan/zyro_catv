@@ -226,6 +226,10 @@ function CustomerDetails() {
                   <span className="profile-value">{customer.customerType?.name || '—'}</span>
                 </div>
                 <div className="profile-item">
+                  <span className="profile-label">STB ID</span>
+                  <span className="profile-value">{customer.stbId || '—'}</span>
+                </div>
+                <div className="profile-item">
                   <span className="profile-label">মাসিক বিল</span>
                   <span className="profile-value">{formatCurrency(customer.monthlyFee)}</span>
                 </div>
