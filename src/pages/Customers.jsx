@@ -199,6 +199,7 @@ function Customers() {
   const [meta, setMeta] = useState({ total: 0, page: 1, perPage: 50, totalPages: 1 })
   const [isOpen, setIsOpen] = useState(false)
   const [isImportOpen, setIsImportOpen] = useState(false)
+  const [isStbImportOpen, setIsStbImportOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [importFile, setImportFile] = useState(null)
   const [allowMissingMobile, setAllowMissingMobile] = useState(false)
@@ -207,6 +208,11 @@ function Customers() {
   const [importErrors, setImportErrors] = useState([])
   const [importSkipped, setImportSkipped] = useState([])
   const [isImporting, setIsImporting] = useState(false)
+  // STB import state
+  const [stbFile, setStbFile] = useState(null)
+  const [isStbImporting, setIsStbImporting] = useState(false)
+  const [stbResult, setStbResult] = useState(null)
+  const [stbError, setStbError] = useState(null)
   const [form, setForm] = useState({
     areaId: '',
     customerTypeId: '',
@@ -323,6 +329,43 @@ function Customers() {
     setImportSummary(null)
     setImportErrors([])
     setImportSkipped([])
+  }
+
+  const resetStbImport = () => {
+    setStbFile(null)
+    setStbResult(null)
+    setStbError(null)
+  }
+
+  const handleStbImport = async (event) => {
+    event.preventDefault()
+    if (!stbFile) {
+      setStbError('একটি Excel ফাইল নির্বাচন করুন')
+      return
+    }
+    setIsStbImporting(true)
+    setStbError(null)
+    setStbResult(null)
+    try {
+      const token = localStorage.getItem('auth_token')
+      const formData = new FormData()
+      formData.append('file', stbFile)
+      const response = await fetch(`${apiBase}/customers/import-stb`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setStbError(data.error || 'সার্ভার সমস্যা হয়েছে')
+      } else {
+        setStbResult(data)
+      }
+    } catch {
+      setStbError('নেটওয়ার্ক সমস্যা হয়েছে')
+    } finally {
+      setIsStbImporting(false)
+    }
   }
 
   const formatDateValue = (value) => {
@@ -550,6 +593,18 @@ function Customers() {
             >
               বাল্ক ইমপোর্ট
             </button>
+            {role !== 'COLLECTOR' && (
+              <button
+                className="btn ghost"
+                type="button"
+                onClick={() => {
+                  resetStbImport()
+                  setIsStbImportOpen(true)
+                }}
+              >
+                STB আমদানি
+              </button>
+            )}
             <button
               className="btn primary"
               type="button"
@@ -949,6 +1004,86 @@ function Customers() {
             setIsImportOpen(false)
             resetImport()
           }}
+        />
+      </div>
+
+      {/* ─── STB Import Modal ─────────────────────────────── */}
+      <div className={`modal-overlay ${isStbImportOpen ? 'is-open' : ''}`}>
+        <div
+          className="modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <h3>STB ID বাল্ক আমদানি</h3>
+            <button
+              className="btn outline"
+              type="button"
+              onClick={() => { setIsStbImportOpen(false); resetStbImport() }}
+            >
+              ✕
+            </button>
+          </div>
+          <form className="auth-form" onSubmit={handleStbImport}>
+            <div className="field">
+              <span>Excel ফাইলের ফরম্যাট</span>
+              <div className="module-sub">
+                প্রথম কলাম: <strong>ClientCode</strong> &nbsp;|&nbsp; দ্বিতীয় কলাম: <strong>StbId</strong>
+                <br />প্রথম রো হেডার থাকতে হবে।
+              </div>
+            </div>
+            <label className="field">
+              <span>Excel ফাইল (.xlsx / .xls)</span>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => { setStbFile(e.target.files?.[0] || null); setStbResult(null); setStbError(null) }}
+              />
+            </label>
+            {stbError && (
+              <div className="status-banner error">⚠️ {stbError}</div>
+            )}
+            {stbResult && (
+              <>
+                <div className="status-banner success">
+                  আপডেট: <strong>{stbResult.updated}</strong> &nbsp;|&nbsp;
+                  আগে থেকে একই: <strong>{stbResult.alreadySame}</strong> &nbsp;|&nbsp;
+                  পাওয়া যায়নি: <strong>{stbResult.notFound}</strong>
+                </div>
+                {stbResult.notFoundCodes?.length > 0 && (
+                  <div className="import-skipped-section">
+                    <h4 className="skipped-title">DB তে পাওয়া যায়নি — skip হয়েছে ({stbResult.notFoundCodes.length} টি)</h4>
+                    <div className="skipped-list">
+                      {stbResult.notFoundCodes.map((code) => (
+                        <div key={code} className="skipped-item">
+                          <span className="skipped-code">{code}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="modal-actions">
+              <button
+                className="btn ghost"
+                type="button"
+                onClick={() => { setIsStbImportOpen(false); resetStbImport() }}
+              >
+                বন্ধ করুন
+              </button>
+              <button className="btn primary" type="submit" disabled={isStbImporting}>
+                {isStbImporting ? 'আপডেট হচ্ছে...' : 'আপডেট করুন'}
+              </button>
+            </div>
+          </form>
+        </div>
+        <button
+          className="modal-backdrop"
+          type="button"
+          aria-label="Close"
+          onClick={() => { setIsStbImportOpen(false); resetStbImport() }}
         />
       </div>
 

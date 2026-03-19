@@ -722,4 +722,108 @@ router.delete('/cleanup-all', requireAuth, requireRole(['ADMIN']), async (req, r
   }
 })
 
+// Excel থেকে STB ID বাল্ক আপডেট
+router.post(
+  '/import-stb',
+  requireAuth,
+  requireRole(['ADMIN', 'MANAGER']),
+  upload.single('file'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'Excel ফাইল প্রয়োজন' })
+      }
+
+      let workbook
+      try {
+        workbook = xlsx.read(req.file.buffer, { type: 'buffer' })
+      } catch {
+        return res.status(400).json({ error: 'Invalid Excel file' })
+      }
+
+      const sheetName = workbook.SheetNames[0]
+      if (!sheetName) {
+        return res.status(400).json({ error: 'Excel sheet পাওয়া যায়নি' })
+      }
+
+      const sheet = workbook.Sheets[sheetName]
+      // header:1 → প্রথম রো key হিসেবে ব্যবহার করা হবে
+      const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+
+      if (rows.length < 2) {
+        return res.status(400).json({ error: 'ফাইলে কোনো ডেটা রো নেই' })
+      }
+
+      // প্রথম রো header — normalize করে column index বের করি
+      const headerRow = rows[0].map((h) => String(h).trim().toLowerCase().replace(/\s+/g, ''))
+      const clientCodeIdx = headerRow.findIndex(
+        (h) => h === 'clientcode' || h === 'customercode' || h === 'code' || h === 'ক্লায়েন্টকোড' || h === 'গ্রাহককোড'
+      )
+      const stbIdIdx = headerRow.findIndex(
+        (h) => h === 'stbid' || h === 'stb' || h === 'এসটিবিআইডি'
+      )
+
+      if (clientCodeIdx === -1) {
+        return res.status(400).json({ error: '"ClientCode" কলাম খুঁজে পাওয়া যায়নি' })
+      }
+      if (stbIdIdx === -1) {
+        return res.status(400).json({ error: '"StbId" কলাম খুঁজে পাওয়া যায়নি' })
+      }
+
+      const dataRows = rows.slice(1)
+      let updatedCount = 0
+      let alreadySameCount = 0
+      const notFoundCodes = []
+      const updatedList = []
+
+      for (let i = 0; i < dataRows.length; i += 1) {
+        const row = dataRows[i]
+        const rawCode = String(row[clientCodeIdx] ?? '').trim()
+        const rawStbId = String(row[stbIdIdx] ?? '').trim()
+
+        if (!rawCode) continue
+
+        const stbId = rawStbId || null
+
+        // শুধু নিজের company-র গ্রাহক খুঁজব
+        // eslint-disable-next-line no-await-in-loop
+        const customer = await prisma.customer.findFirst({
+          where: { customerCode: rawCode, companyId: req.user.companyId, deletedAt: null },
+          select: { id: true, name: true, stbId: true },
+        })
+
+        if (!customer) {
+          notFoundCodes.push(rawCode)
+          continue
+        }
+
+        if (customer.stbId === stbId) {
+          alreadySameCount += 1
+          continue
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: { stbId },
+        })
+
+        updatedCount += 1
+        updatedList.push({ customerCode: rawCode, name: customer.name, stbId })
+      }
+
+      return res.json({
+        success: true,
+        updated: updatedCount,
+        alreadySame: alreadySameCount,
+        notFound: notFoundCodes.length,
+        notFoundCodes,
+        updatedList,
+      })
+    } catch (error) {
+      return next(error)
+    }
+  }
+)
+
 export default router
