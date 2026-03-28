@@ -12,6 +12,7 @@ import reportRoutes from './routes/reports.js'
 import userRoutes from './routes/users.js'
 import adminRoutes from './routes/admin.js'
 import supportCategoryRoutes from './routes/support-categories.js'
+import supportTicketRoutes from './routes/support-tickets.js'
 
 const app = express()
 
@@ -34,6 +35,7 @@ app.use('/api/reports', reportRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/support-categories', supportCategoryRoutes)
+app.use('/api/support-tickets', supportTicketRoutes)
 
 app.use((err, req, res, next) => {
   console.error(err)
