@@ -14,12 +14,12 @@ const priorityOptions = [
 
 const statusOptions = [
   { value: '', label: 'সব স্ট্যাটাস' },
-  { value: 'OPEN', label: 'OPEN' },
-  { value: 'IN_PROGRESS', label: 'IN_PROGRESS' },
-  { value: 'RESOLVED', label: 'RESOLVED' },
-  { value: 'CLOSED', label: 'CLOSED' },
-  { value: 'ESCALATED', label: 'ESCALATED' },
+  { value: 'PENDING', label: 'পেন্ডিং' },
+  { value: 'PROCESSING', label: 'প্রসেসিং' },
+  { value: 'COMPLETED', label: 'সম্পন্ন' },
 ]
+
+const ticketStatusOptions = statusOptions.filter((item) => item.value)
 
 const guestFilterOptions = [
   { value: '', label: 'সব টিকেট' },
@@ -36,20 +36,42 @@ const priorityClass = (p) => {
 }
 
 const statusClass = (s) => {
-  if (s === 'OPEN') return 'advance'
-  if (s === 'IN_PROGRESS') return 'free'
-  if (s === 'RESOLVED') return 'paid'
-  if (s === 'CLOSED') return 'closed'
-  if (s === 'ESCALATED') return 'due'
+  if (s === 'PENDING') return 'due'
+  if (s === 'PROCESSING') return 'free'
+  if (s === 'COMPLETED') return 'paid'
   return 'closed'
+}
+
+const getUserRole = () => {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  try {
+    const payload = JSON.parse(atob(parts[1]))
+    return payload?.role || null
+  } catch (error) {
+    return null
+  }
 }
 
 function CustomerSupport() {
   const [rows, setRows] = useState([])
   const [categories, setCategories] = useState([])
+  const [userRole, setUserRole] = useState(null)
   const [status, setStatus] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const [editForm, setEditForm] = useState({
+    category: '',
+    priority: 'MEDIUM',
+    status: 'PENDING',
+    description: '',
+    alternateMobile: '',
+  })
+  const [statusUpdatingId, setStatusUpdatingId] = useState('')
 
   const [filters, setFilters] = useState({
     status: '',
@@ -78,6 +100,8 @@ function CustomerSupport() {
   const [customerResults, setCustomerResults] = useState([])
   const [selectedCustomerDetails, setSelectedCustomerDetails] = useState(null)
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false)
+
+  const canManageTickets = userRole === 'ADMIN' || userRole === 'MANAGER'
 
   const activeCategories = useMemo(
     () => categories.filter((item) => item.isActive),
@@ -112,6 +136,7 @@ function CustomerSupport() {
       if (filters.category) params.set('category', filters.category)
       if (filters.guest) params.set('guest', filters.guest)
       if (filters.q.trim()) params.set('q', filters.q.trim())
+      params.set('view', 'active')
 
       const response = await fetch(`${apiBase}/support-tickets?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -146,6 +171,7 @@ function CustomerSupport() {
   }
 
   useEffect(() => {
+    setUserRole(getUserRole())
     loadCategories()
   }, [])
 
@@ -297,6 +323,140 @@ function CustomerSupport() {
     }
   }
 
+  const openEditModal = (row) => {
+    setEditingId(row.id)
+    setEditForm({
+      category: row.category || '',
+      priority: row.priority || 'MEDIUM',
+      status: row.status || 'PENDING',
+      description: row.description || '',
+      alternateMobile: row.alternateMobile || '',
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false)
+    setEditingId('')
+    setEditForm({
+      category: '',
+      priority: 'MEDIUM',
+      status: 'PENDING',
+      description: '',
+      alternateMobile: '',
+    })
+  }
+
+  const updateTicketStatus = async (ticketId, nextStatus) => {
+    const token = localStorage.getItem('auth_token')
+    if (!token || !canManageTickets) return
+    setStatus('')
+    setStatusUpdatingId(ticketId)
+
+    try {
+      const response = await fetch(`${apiBase}/support-tickets/${ticketId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'টিকেট স্ট্যাটাস আপডেট করা যায়নি')
+      }
+      setRows((prev) => prev.map((row) => (row.id === ticketId ? data.data : row)))
+      setStatus(`টিকেট স্ট্যাটাস আপডেট হয়েছে: ${data.data.ticketNumber}`)
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setStatusUpdatingId('')
+    }
+  }
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault()
+    const token = localStorage.getItem('auth_token')
+    if (!token || !editingId || !canManageTickets) return
+
+    setIsLoading(true)
+    setStatus('')
+    try {
+      const updatePayload = {
+        category: editForm.category,
+        priority: editForm.priority,
+        description: editForm.description,
+        alternateMobile: editForm.alternateMobile || null,
+      }
+
+      const updateRes = await fetch(`${apiBase}/support-tickets/${editingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updatePayload),
+      })
+      const updateData = await updateRes.json()
+      if (!updateRes.ok) {
+        throw new Error(updateData.error || 'টিকেট আপডেট করা যায়নি')
+      }
+
+      let merged = updateData.data
+      if (editForm.status !== updateData.data.status) {
+        const statusRes = await fetch(`${apiBase}/support-tickets/${editingId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: editForm.status }),
+        })
+        const statusData = await statusRes.json()
+        if (!statusRes.ok) {
+          throw new Error(statusData.error || 'স্ট্যাটাস আপডেট করা যায়নি')
+        }
+        merged = statusData.data
+      }
+
+      setRows((prev) => prev.map((row) => (row.id === editingId ? merged : row)))
+      setStatus(`টিকেট আপডেট হয়েছে: ${merged.ticketNumber}`)
+      closeEditModal()
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteTicket = async (row) => {
+    const token = localStorage.getItem('auth_token')
+    if (!token || !canManageTickets) return
+
+    const ok = window.confirm(`"${row.ticketNumber}" টিকেট ডিলিট করবেন?`)
+    if (!ok) return
+
+    setIsLoading(true)
+    setStatus('')
+    try {
+      const response = await fetch(`${apiBase}/support-tickets/${row.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'টিকেট ডিলিট করা যায়নি')
+      }
+      setRows((prev) => prev.filter((item) => item.id !== row.id))
+      setStatus(`টিকেট ডিলিট হয়েছে: ${row.ticketNumber}`)
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const renderCustomerDetails = () => {
     const customer = selectedCustomerDetails?.customer
     if (!customer) return null
@@ -395,11 +555,14 @@ function CustomerSupport() {
                 <th>টিকেট</th>
                 <th>ধরণ</th>
                 <th>গ্রাহক</th>
+                <th>এরিয়া / ঠিকানা</th>
                 <th>মোবাইল</th>
                 <th>ক্যাটাগরি</th>
+                <th>সমস্যার বিবরণ</th>
                 <th>Priority</th>
                 <th>Status</th>
                 <th>সময়</th>
+                {canManageTickets ? <th>অ্যাকশন</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -414,14 +577,49 @@ function CustomerSupport() {
                     <div>{row.customerName || '—'}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.customerCode || '—'}</div>
                   </td>
+                  <td style={{ maxWidth: 220 }}>
+                    <div style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                      {row.isGuest ? (row.customerAddress || '—') : (row.areaName || '—')}
+                    </div>
+                  </td>
                   <td>
                     <div>{row.customerMobile || '—'}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)' }}>{row.alternateMobile || '—'}</div>
                   </td>
                   <td>{row.category}</td>
+                  <td style={{ maxWidth: 240 }}>
+                    <div style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.description || '—'}</div>
+                  </td>
                   <td>{row.priority}</td>
-                  <td>{row.status}</td>
+                  <td>
+                    {canManageTickets ? (
+                      <select
+                        className="search-box"
+                        value={row.status}
+                        disabled={statusUpdatingId === row.id}
+                        onChange={(event) => updateTicketStatus(row.id, event.target.value)}
+                      >
+                        {ticketStatusOptions.map((item) => (
+                          <option key={item.value} value={item.value}>{item.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      row.status
+                    )}
+                  </td>
                   <td>{new Date(row.createdAt).toLocaleString('bn-BD')}</td>
+                  {canManageTickets ? (
+                    <td>
+                      <div className="action-buttons">
+                        <button className="btn ghost small" type="button" onClick={() => openEditModal(row)}>
+                          এডিট
+                        </button>
+                        <button className="btn outline small" type="button" onClick={() => handleDeleteTicket(row)}>
+                          ডিলিট
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -459,6 +657,38 @@ function CustomerSupport() {
                   {row.alternateMobile ? <div className="card-sub">{row.alternateMobile}</div> : null}
                 </div>
               </div>
+              <div className="card-row" style={{ alignItems: 'flex-start' }}>
+                <span>{row.isGuest ? 'ঠিকানা' : 'এরিয়া'}</span>
+                <span style={{ textAlign: 'right', whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: 180 }}>
+                  {row.isGuest ? (row.customerAddress || '—') : (row.areaName || '—')}
+                </span>
+              </div>
+              <div className="card-row" style={{ alignItems: 'flex-start' }}>
+                <span>সমস্যা</span>
+                <span style={{ textAlign: 'right', whiteSpace: 'normal', wordBreak: 'break-word', maxWidth: 180 }}>
+                  {row.description || '—'}
+                </span>
+              </div>
+              {canManageTickets ? (
+                <div className="card-actions">
+                  <select
+                    className="search-box"
+                    value={row.status}
+                    disabled={statusUpdatingId === row.id}
+                    onChange={(event) => updateTicketStatus(row.id, event.target.value)}
+                  >
+                    {ticketStatusOptions.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                  <button className="btn ghost small" type="button" onClick={() => openEditModal(row)}>
+                    এডিট
+                  </button>
+                  <button className="btn outline small" type="button" onClick={() => handleDeleteTicket(row)}>
+                    ডিলিট
+                  </button>
+                </div>
+              ) : null}
               <div className="card-row">
                 <span>সময়</span>
                 <span style={{ fontSize: 13 }}>{new Date(row.createdAt).toLocaleString('bn-BD')}</span>
@@ -666,6 +896,94 @@ function CustomerSupport() {
           </form>
         </div>
         <button className="modal-backdrop" type="button" aria-label="Close" onClick={closeModal} />
+      </div>
+
+      <div className={`modal-overlay ${isEditModalOpen ? 'is-open' : ''}`}>
+        <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-header">
+            <h3>সাপোর্ট টিকেট এডিট</h3>
+            <button className="btn outline" type="button" onClick={closeEditModal}>✕</button>
+          </div>
+
+          <form className="auth-form" onSubmit={handleEditSubmit}>
+            <div className="form-grid">
+              <label className="field">
+                <span>সমস্যার ধরন</span>
+                <select
+                  value={editForm.category}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, category: event.target.value }))}
+                >
+                  <option value="">ক্যাটাগরি নির্বাচন করুন</option>
+                  {activeCategories.map((item) => (
+                    <option key={item.id} value={item.name}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Priority</span>
+                <select
+                  value={editForm.priority}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, priority: event.target.value }))}
+                >
+                  {priorityOptions.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Status</span>
+                <select
+                  value={editForm.status}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value }))}
+                >
+                  {ticketStatusOptions.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>অতিরিক্ত মোবাইল</span>
+                <input
+                  type="text"
+                  value={editForm.alternateMobile}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, alternateMobile: event.target.value }))}
+                  placeholder="01XXXXXXXXX"
+                />
+              </label>
+            </div>
+
+            <label className="field">
+              <span>সমস্যার বিবরণ (সর্বোচ্চ ২৫০ অক্ষর)</span>
+              <textarea
+                maxLength={250}
+                value={editForm.description}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, description: event.target.value }))}
+                rows={4}
+                style={{
+                  border: '1px solid #e6e1d7',
+                  borderRadius: 12,
+                  padding: '0.7rem 0.9rem',
+                  background: '#fffaf2',
+                  fontSize: '0.95rem',
+                  color: 'var(--ink)',
+                  resize: 'vertical',
+                }}
+              />
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{editForm.description.length}/250</span>
+            </label>
+
+            <div className="modal-actions">
+              <button className="btn ghost" type="button" onClick={closeEditModal}>বন্ধ করুন</button>
+              <button className="btn primary" type="submit" disabled={isLoading}>
+                {isLoading ? 'আপডেট হচ্ছে...' : 'আপডেট করুন'}
+              </button>
+            </div>
+          </form>
+        </div>
+        <button className="modal-backdrop" type="button" aria-label="Close" onClick={closeEditModal} />
       </div>
     </AppLayout>
   )
