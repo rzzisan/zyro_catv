@@ -328,6 +328,16 @@ model SupportTicket {
   ticketNumber String         @unique
   companyId   String
   createdById String
+  customerId  String?
+  isGuest     Boolean        @default(false)
+  customerName String?
+  customerCode String?
+  customerMobile String?
+  alternateMobile String?
+  customerStbId String?
+  customerAddress String?
+  areaName    String?
+  customerTypeName String?
   title       String
   description String         @db.Text
   priority    TicketPriority @default(MEDIUM)
@@ -341,8 +351,25 @@ model SupportTicket {
   resolvedAt  DateTime?
 
   @@index([companyId, status])
+  @@index([companyId, isGuest])
+  @@index([companyId, customerId])
+  @@index([companyId, category])
   @@index([assignedTo])
   @@index([createdAt])
+}
+
+model SupportCategory {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
 }
 
 model EmailTemplate {
