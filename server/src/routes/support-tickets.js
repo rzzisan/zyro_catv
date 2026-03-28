@@ -6,6 +6,29 @@ import { requireAuth, requireRole } from '../lib/auth.js'
 const router = express.Router()
 const bdMobileRegex = /^01[3-9]\d{8}$/
 
+const uiToDbStatus = {
+  PENDING: ['OPEN'],
+  PROCESSING: ['IN_PROGRESS', 'ESCALATED'],
+  COMPLETED: ['RESOLVED', 'CLOSED'],
+}
+
+const normalizeStatus = (status) => {
+  if (status === 'OPEN') return 'PENDING'
+  if (status === 'IN_PROGRESS' || status === 'ESCALATED') return 'PROCESSING'
+  if (status === 'RESOLVED' || status === 'CLOSED') return 'COMPLETED'
+  return 'PENDING'
+}
+
+const startOfToday = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+}
+
+const startOfTomorrow = () => {
+  const today = startOfToday()
+  return new Date(today.getTime() + 24 * 60 * 60 * 1000)
+}
+
 const createTicketSchema = z.object({
   guestTicket: z.boolean().optional(),
   customerId: z.string().optional(),
@@ -22,6 +45,17 @@ const createTicketSchema = z.object({
   alternateMobile: z.string().max(20).optional().nullable(),
 })
 
+const updateTicketSchema = z.object({
+  category: z.string().min(2).max(80).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  description: z.string().min(3).max(250).optional(),
+  alternateMobile: z.string().max(20).optional().nullable(),
+})
+
+const updateStatusSchema = z.object({
+  status: z.enum(['PENDING', 'PROCESSING', 'COMPLETED']),
+})
+
 const generateTicketNumber = () => {
   const now = new Date()
   const y = now.getFullYear()
@@ -33,28 +67,80 @@ const generateTicketNumber = () => {
 
 router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), async (req, res, next) => {
   try {
-    const { status, priority, category, q, guest } = req.query
-    const where = {
-      companyId: req.user.companyId,
-    }
+    const { status, priority, category, q, guest, view } = req.query
+    const mode = String(view || 'active').toLowerCase()
+    const todayStart = startOfToday()
+    const tomorrowStart = startOfTomorrow()
+    const filters = []
 
-    if (status) where.status = String(status)
-    if (priority) where.priority = String(priority)
-    if (category) where.category = String(category)
-    if (String(guest) === 'true') where.isGuest = true
-    if (String(guest) === 'false') where.isGuest = false
+    if (priority) filters.push({ priority: String(priority) })
+    if (category) filters.push({ category: String(category) })
+    if (String(guest) === 'true') filters.push({ isGuest: true })
+    if (String(guest) === 'false') filters.push({ isGuest: false })
+
+    const uiStatus = String(status || '').toUpperCase()
+    const statusIn = uiToDbStatus[uiStatus]
+    if (statusIn) {
+      filters.push({ status: { in: statusIn } })
+    }
 
     if (q) {
       const needle = String(q)
-      where.OR = [
-        { ticketNumber: { contains: needle } },
-        { title: { contains: needle } },
-        { description: { contains: needle } },
-        { customerName: { contains: needle } },
-        { customerCode: { contains: needle } },
-        { customerMobile: { contains: needle } },
-        { customerStbId: { contains: needle } },
-      ]
+      filters.push({
+        OR: [
+          { ticketNumber: { contains: needle } },
+          { title: { contains: needle } },
+          { description: { contains: needle } },
+          { customerName: { contains: needle } },
+          { customerCode: { contains: needle } },
+          { customerMobile: { contains: needle } },
+          { customerStbId: { contains: needle } },
+        ],
+      })
+    }
+
+    if (mode === 'history') {
+      filters.push({
+        status: { in: uiToDbStatus.COMPLETED },
+      })
+      filters.push({
+        OR: [
+          { resolvedAt: { lt: todayStart } },
+          {
+            AND: [
+              { resolvedAt: null },
+              { updatedAt: { lt: todayStart } },
+            ],
+          },
+        ],
+      })
+    } else {
+      filters.push({
+        OR: [
+          { status: { in: [...uiToDbStatus.PENDING, ...uiToDbStatus.PROCESSING] } },
+          {
+            AND: [
+              { status: { in: uiToDbStatus.COMPLETED } },
+              {
+                OR: [
+                  { resolvedAt: { gte: todayStart, lt: tomorrowStart } },
+                  {
+                    AND: [
+                      { resolvedAt: null },
+                      { updatedAt: { gte: todayStart, lt: tomorrowStart } },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+    }
+
+    const where = {
+      companyId: req.user.companyId,
+      AND: filters,
     }
 
     const rows = await prisma.supportTicket.findMany({
@@ -63,7 +149,12 @@ router.get('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), asy
       take: 200,
     })
 
-    return res.json({ data: rows })
+    const normalizedRows = rows.map((row) => ({
+      ...row,
+      status: normalizeStatus(row.status),
+    }))
+
+    return res.json({ data: normalizedRows })
   } catch (error) {
     return next(error)
   }
@@ -164,7 +255,132 @@ router.post('/', requireAuth, requireRole(['ADMIN', 'MANAGER', 'COLLECTOR']), as
       return res.status(500).json({ error: 'Ticket number generation failed' })
     }
 
-    return res.status(201).json({ data: created })
+    return res.status(201).json({
+      data: {
+        ...created,
+        status: normalizeStatus(created.status),
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.patch('/:id/status', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const parsed = updateStatusSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid status', details: parsed.error.issues })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: {
+        id: req.params.id,
+        companyId: req.user.companyId,
+      },
+      select: { id: true },
+    })
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' })
+    }
+
+    const nextStatus = parsed.data.status
+    const dbStatus = nextStatus === 'PENDING'
+      ? 'OPEN'
+      : nextStatus === 'PROCESSING'
+        ? 'IN_PROGRESS'
+        : 'RESOLVED'
+
+    const updated = await prisma.supportTicket.update({
+      where: { id: req.params.id },
+      data: {
+        status: dbStatus,
+        resolvedAt: nextStatus === 'COMPLETED' ? new Date() : null,
+      },
+    })
+
+    return res.json({
+      data: {
+        ...updated,
+        status: normalizeStatus(updated.status),
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.patch('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const parsed = updateTicketSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
+    }
+
+    const payload = parsed.data
+    const updateData = {}
+
+    if (payload.category !== undefined) {
+      updateData.category = payload.category.trim()
+      updateData.title = `${payload.category.trim()} সমস্যা`
+    }
+    if (payload.priority !== undefined) updateData.priority = payload.priority
+    if (payload.description !== undefined) updateData.description = payload.description.trim()
+    if (payload.alternateMobile !== undefined) {
+      const mobile = payload.alternateMobile ? String(payload.alternateMobile).trim() : null
+      if (mobile && !bdMobileRegex.test(mobile)) {
+        return res.status(400).json({ error: 'Invalid alternate mobile' })
+      }
+      updateData.alternateMobile = mobile
+    }
+
+    if (!Object.keys(updateData).length) {
+      return res.status(400).json({ error: 'No changes provided' })
+    }
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: {
+        id: req.params.id,
+        companyId: req.user.companyId,
+      },
+      select: { id: true },
+    })
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' })
+    }
+
+    const updated = await prisma.supportTicket.update({
+      where: { id: req.params.id },
+      data: updateData,
+    })
+
+    return res.json({
+      data: {
+        ...updated,
+        status: normalizeStatus(updated.status),
+      },
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+router.delete('/:id', requireAuth, requireRole(['ADMIN', 'MANAGER']), async (req, res, next) => {
+  try {
+    const deleted = await prisma.supportTicket.deleteMany({
+      where: {
+        id: req.params.id,
+        companyId: req.user.companyId,
+      },
+    })
+
+    if (!deleted.count) {
+      return res.status(404).json({ error: 'Ticket not found' })
+    }
+
+    return res.json({ ok: true })
   } catch (error) {
     return next(error)
   }
