@@ -1,6 +1,6 @@
 import express from 'express'
 import prisma from '../lib/prisma.js'
-import { requireAuth, requireRole } from '../lib/auth.js'
+import { requireAuth } from '../lib/auth.js'
 
 const router = express.Router()
 
@@ -14,7 +14,266 @@ const requireSuperAdmin = (req, res, next) => {
   next()
 }
 
+const getBillingCycleFromDuration = (durationMonths) => {
+  if (durationMonths === 12) return 'YEARLY'
+  return 'MONTHLY'
+}
+
+const validatePackagePayload = ({ name, billingCycle, price, maxCustomers }) => {
+  if (!name || typeof name !== 'string') {
+    return 'প্যাকেজের নাম প্রয়োজন'
+  }
+
+  const normalizedCycle = String(billingCycle || '').toUpperCase()
+  if (!['MONTHLY', 'YEARLY'].includes(normalizedCycle)) {
+    return 'বিলিং সাইকেল মাসিক বা বাৎসরিক হতে হবে'
+  }
+
+  const parsedPrice = Number(price)
+  if (!Number.isInteger(parsedPrice) || parsedPrice <= 0) {
+    return 'দাম অবশ্যই পূর্ণসংখ্যা এবং ০ এর বেশি হতে হবে'
+  }
+
+  const parsedMaxCustomers = Number(maxCustomers)
+  if (!Number.isInteger(parsedMaxCustomers) || parsedMaxCustomers <= 0) {
+    return 'গ্রাহক সংখ্যা অবশ্যই পূর্ণসংখ্যা এবং ০ এর বেশি হতে হবে'
+  }
+
+  const trimmedName = name.trim()
+  if (!trimmedName) {
+    return 'প্যাকেজের নাম ফাঁকা হতে পারবে না'
+  }
+
+  return null
+}
+
 // ==================== DASHBOARD ====================
+
+// ==================== PACKAGE MANAGEMENT ====================
+
+/**
+ * GET /api/admin/packages
+ * সব প্যাকেজ লিস্ট
+ * ?trash=1 দিলে soft-deleted গুলো দেখাবে
+ */
+router.get('/packages', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const showTrash = req.query.trash === '1'
+
+    const packages = await prisma.package.findMany({
+      where: showTrash
+        ? { deletedAt: { not: null } }
+        : { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return res.json({
+      data: packages.map((pkg) => ({
+        ...pkg,
+        billingCycle: getBillingCycleFromDuration(pkg.durationMonths),
+      })),
+    })
+  } catch (error) {
+    console.error('Packages list error:', error)
+    return res.status(500).json({ error: 'প্যাকেজ লোড করা যায়নি' })
+  }
+})
+
+/**
+ * POST /api/admin/packages
+ * নতুন প্যাকেজ তৈরি করা
+ */
+router.post('/packages', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { name, billingCycle, price, maxCustomers } = req.body
+
+    const validationError = validatePackagePayload({ name, billingCycle, price, maxCustomers })
+    if (validationError) {
+      return res.status(400).json({ error: validationError })
+    }
+
+    const normalizedCycle = String(billingCycle || '').toUpperCase()
+    const parsedPrice = Number(price)
+    const parsedMaxCustomers = Number(maxCustomers)
+    const trimmedName = name.trim()
+
+    const existing = await prisma.package.findFirst({
+      where: {
+        name: {
+          equals: trimmedName,
+        },
+      },
+      select: { id: true },
+    })
+
+    if (existing) {
+      return res.status(409).json({ error: 'এই নামে একটি প্যাকেজ ইতিমধ্যেই আছে' })
+    }
+
+    const created = await prisma.package.create({
+      data: {
+        name: trimmedName,
+        price: parsedPrice,
+        durationMonths: normalizedCycle === 'YEARLY' ? 12 : 1,
+        maxCustomers: parsedMaxCustomers,
+      },
+    })
+
+    return res.status(201).json({
+      data: {
+        ...created,
+        billingCycle: getBillingCycleFromDuration(created.durationMonths),
+      },
+      message: 'প্যাকেজ সফলভাবে তৈরি হয়েছে',
+    })
+  } catch (error) {
+    console.error('Package create error:', error)
+    return res.status(500).json({ error: 'প্যাকেজ তৈরি করা যায়নি' })
+  }
+})
+
+/**
+ * PUT /api/admin/packages/:packageId
+ * প্যাকেজ আপডেট করা
+ */
+router.put('/packages/:packageId', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { packageId } = req.params
+    const { name, billingCycle, price, maxCustomers } = req.body
+
+    const existingPackage = await prisma.package.findUnique({
+      where: { id: packageId },
+      select: { id: true, deletedAt: true },
+    })
+
+    if (!existingPackage) {
+      return res.status(404).json({ error: 'প্যাকেজ খুঁজে পাওয়া যায়নি' })
+    }
+
+    if (existingPackage.deletedAt) {
+      return res.status(409).json({ error: 'ডিলিট করা প্যাকেজ সম্পাদনা করা যায় না। আগে রিস্টোর করুন।' })
+    }
+
+    const validationError = validatePackagePayload({ name, billingCycle, price, maxCustomers })
+    if (validationError) {
+      return res.status(400).json({ error: validationError })
+    }
+
+    const normalizedCycle = String(billingCycle || '').toUpperCase()
+    const parsedPrice = Number(price)
+    const parsedMaxCustomers = Number(maxCustomers)
+    const trimmedName = name.trim()
+
+    const duplicate = await prisma.package.findFirst({
+      where: {
+        id: { not: packageId },
+        name: {
+          equals: trimmedName,
+        },
+      },
+      select: { id: true },
+    })
+
+    if (duplicate) {
+      return res.status(409).json({ error: 'এই নামে একটি প্যাকেজ ইতিমধ্যেই আছে' })
+    }
+
+    const updated = await prisma.package.update({
+      where: { id: packageId },
+      data: {
+        name: trimmedName,
+        price: parsedPrice,
+        durationMonths: normalizedCycle === 'YEARLY' ? 12 : 1,
+        maxCustomers: parsedMaxCustomers,
+      },
+    })
+
+    return res.json({
+      data: {
+        ...updated,
+        billingCycle: getBillingCycleFromDuration(updated.durationMonths),
+      },
+      message: 'প্যাকেজ সফলভাবে আপডেট হয়েছে',
+    })
+  } catch (error) {
+    console.error('Package update error:', error)
+    return res.status(500).json({ error: 'প্যাকেজ আপডেট করা যায়নি' })
+  }
+})
+
+/**
+ * DELETE /api/admin/packages/:packageId
+ * প্যাকেজ সফট ডিলিট (archive)
+ */
+router.delete('/packages/:packageId', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { packageId } = req.params
+
+    const existingPackage = await prisma.package.findUnique({
+      where: { id: packageId },
+      select: { id: true, name: true, deletedAt: true },
+    })
+
+    if (!existingPackage) {
+      return res.status(404).json({ error: 'প্যাকেজ খুঁজে পাওয়া যায়নি' })
+    }
+
+    if (existingPackage.deletedAt) {
+      return res.status(409).json({ error: 'প্যাকেজটি ইতিমধ্যেই ডিলিট করা আছে' })
+    }
+
+    const updated = await prisma.package.update({
+      where: { id: packageId },
+      data: { deletedAt: new Date() },
+    })
+
+    return res.json({
+      ok: true,
+      data: { ...updated, billingCycle: getBillingCycleFromDuration(updated.durationMonths) },
+      message: `${existingPackage.name} প্যাকেজ ডিলিট হয়েছে`,
+    })
+  } catch (error) {
+    console.error('Package soft-delete error:', error)
+    return res.status(500).json({ error: 'প্যাকেজ ডিলিট করা যায়নি' })
+  }
+})
+
+/**
+ * POST /api/admin/packages/:packageId/restore
+ * সফট-ডিলিট করা প্যাকেজ রিস্টোর করা
+ */
+router.post('/packages/:packageId/restore', requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { packageId } = req.params
+
+    const existingPackage = await prisma.package.findUnique({
+      where: { id: packageId },
+      select: { id: true, name: true, deletedAt: true },
+    })
+
+    if (!existingPackage) {
+      return res.status(404).json({ error: 'প্যাকেজ খুঁজে পাওয়া যায়নি' })
+    }
+
+    if (!existingPackage.deletedAt) {
+      return res.status(409).json({ error: 'প্যাকেজটি ডিলিট করা নেই, রিস্টোরের প্রয়োজন নেই' })
+    }
+
+    const restored = await prisma.package.update({
+      where: { id: packageId },
+      data: { deletedAt: null },
+    })
+
+    return res.json({
+      ok: true,
+      data: { ...restored, billingCycle: getBillingCycleFromDuration(restored.durationMonths) },
+      message: `${existingPackage.name} প্যাকেজ সফলভাবে রিস্টোর হয়েছে`,
+    })
+  } catch (error) {
+    console.error('Package restore error:', error)
+    return res.status(500).json({ error: 'প্যাকেজ রিস্টোর করা যায়নি' })
+  }
+})
 
 /**
  * GET /api/admin/dashboard/summary

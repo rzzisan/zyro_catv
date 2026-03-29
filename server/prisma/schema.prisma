@@ -39,16 +39,17 @@ enum BillingSystem {
 }
 
 model Package {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   name                String
   price               Int
   durationMonths      Int?
   features            Json?
-  maxCustomers        Int?     // Null = unlimited
-  maxStorage          Int?     // In MB
-  apiRateLimit        Int      @default(10000) // per day
-  supportTier         String   @default("standard") // basic, standard, premium
-  createdAt           DateTime @default(now())
+  maxCustomers        Int?      // Null = unlimited
+  maxStorage          Int?      // In MB
+  apiRateLimit        Int       @default(10000) // per day
+  supportTier         String    @default("standard") // basic, standard, premium
+  createdAt           DateTime  @default(now())
+  deletedAt           DateTime? // Soft delete
   companies           Company[]
   subscriptions       CompanySubscription[]
 }

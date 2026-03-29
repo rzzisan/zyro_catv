@@ -35,10 +35,11 @@ function AdminCompanies() {
     const loadPackages = async () => {
       if (!token) return
       try {
-        const response = await fetch(`${apiBase}/billing/packages`, {
+        const response = await fetch(`${apiBase}/admin/packages`, {
           headers: { Authorization: `Bearer ${token}` },
         })
-        const data = await response.json()
+        const contentType = response.headers.get('content-type') || ''
+        const data = contentType.includes('application/json') ? await response.json() : null
         if (response.ok) {
           setPackages(data.data || [])
         }
